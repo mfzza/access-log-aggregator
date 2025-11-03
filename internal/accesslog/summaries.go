@@ -1,15 +1,10 @@
 package accesslog
 
-func (ss *Summaries) AddRecord(newRecord *Record) {
-	// looking for same host
-	for i := range *ss {
-		if (*ss)[i].host == newRecord.Host {
-			(*ss)[i].updateSummary(newRecord)
-			return
-		}
+func (ss Summaries) AddRecord(newRecord *Record) {
+	if s, ok := ss[newRecord.Host]; ok {
+		s.updateSummary(newRecord)
+		ss[newRecord.Host] = s
+		return
 	}
-	// proceed to append
-	// TODO: handle error
-	s, _ := NewSummary(newRecord.Host)
-	*ss = append(*ss, *s)
+	ss[newRecord.Host] = Summary{}
 }

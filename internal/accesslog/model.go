@@ -14,17 +14,13 @@ type Record struct {
 }
 
 type Summary struct {
-	host         string
 	requestTotal int
 	request2xx   int
 	avgDuration  float64 // in seconds
 }
 
-type Summaries []Summary
-
-func NewSummary(host string) (*Summary, error) {
-	return &Summary{host: host}, nil
-}
+// type Summaries []Summary
+type Summaries map[string]Summary
 
 // TODO: handle missing field
 func NewRecord(jb []byte) (*Record, error) {
