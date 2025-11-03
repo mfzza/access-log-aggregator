@@ -13,16 +13,13 @@ import (
 // }
 
 func main() {
-	warning := "AHAHAHAHAHAHAHAHA"
-	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, warning)
-		os.Exit(2)
-	}
-
-	if len(os.Args) > 2 {
-		fmt.Fprintln(os.Stderr, "Too many arguments\n"+warning)
-		os.Exit(2)
-	}
+	// TODO: implement multiple file read with goroutine
+	// TODO: implement flag parameter
+	// TODO: behaviour to default start read from tail (end of file), and read from beginning when have `-from-start` flag
+	// TODO: tolerate common log rotation
+	// TODO: -interval flag
+	// TODO: tail -F like behaviour
+	// TODO: handle graceful exit
 
 	file, err := os.Open(os.Args[1])
 	if err != nil {
@@ -40,7 +37,7 @@ func main() {
 			break
 		}
 		if err != nil {
-			fmt.Println("cant read, need to learn:", err)
+			fmt.Fprintf(os.Stderr, "cant read file: %v\n", err)
 			break
 		}
 		record, err := accesslog.NewRecord(line)
@@ -48,16 +45,8 @@ func main() {
 			fmt.Println(err)
 			continue
 		}
-
 		ss.AddRecord(record)
-		fmt.Print("=== ", i, " --- ", len(line))
-		record.Print()
 	}
 
-	fmt.Println()
-	fmt.Println()
-	fmt.Println()
-
 	ss.Print()
-
 }

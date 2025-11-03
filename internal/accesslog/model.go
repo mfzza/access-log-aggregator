@@ -26,11 +26,13 @@ func NewSummary(host string) (*Summary, error) {
 	return &Summary{host: host}, nil
 }
 
+// TODO: handle missing field
 func NewRecord(jb []byte) (*Record, error) {
 	var al Record
 	err := json.Unmarshal(jb, &al)
 	if err != nil {
-		return nil, fmt.Errorf("error jsonnya bang: %w", err)
+		// TODO: just skip if malformed, dont return error
+		return nil, fmt.Errorf("invalid JSON: %w", err)
 	}
 	return &al, nil
 }
