@@ -32,7 +32,7 @@ func main() {
 	defer file.Close()
 	r := bufio.NewReader(file)
 
-	als := make([]accesslog.Record, 0)
+	ss := accesslog.Summaries{}
 	for i := 1; ; i++ {
 		// use scanner?
 		line, err := r.ReadBytes('\n')
@@ -43,30 +43,21 @@ func main() {
 			fmt.Println("cant read, need to learn:", err)
 			break
 		}
-		al, err := accesslog.NewRecord(line)
+		record, err := accesslog.NewRecord(line)
 		if err != nil {
 			fmt.Println(err)
 			continue
 		}
 
-		als = append(als, *al)
+		ss.AddRecord(record)
 		fmt.Print("=== ", i, " --- ", len(line))
-		al.Print()
+		record.Print()
 	}
 
 	fmt.Println()
 	fmt.Println()
 	fmt.Println()
 
-	ss := accesslog.Summaries{}
-
-	s, _ := accesslog.NewSummary("chatgpt.com")
-	ss = append(ss, *s)
-	ss = append(ss, *s)
 	ss.Print()
-
-
-
-
 
 }
