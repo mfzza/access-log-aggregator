@@ -1,11 +1,11 @@
 package main
 
-// func NewAccessLog(time time.Time, host string, statusCode int, duration float64) *accessLog {
-// 	return &accessLog{time, host, statusCode, duration}
-// }
+import (
+	"accessAggregator/internal/accesslog"
+	"sync"
+)
 
 func main() {
-	// TODO: implement multiple file read with goroutine
 	// TODO: behaviour to default start read from tail (end of file), and read from beginning when have `-from-start` flag
 	// TODO: tolerate common log rotation
 	// TODO: -interval flag
@@ -13,6 +13,22 @@ func main() {
 	// TODO: handle graceful exit
 
 	cfg := parseFlags()
-	ss := processFiles(cfg.Files)
+	ss := accesslog.Summaries{}
+
+	c := make(chan accesslog.Record, 99)
+
+	done := make(chan struct{})
+	go aggregateRecord(c, &ss, done)
+
+	var wg sync.WaitGroup
+	for _, file := range cfg.Files {
+		wg.Add(1)
+		go processFiles(c, file, &wg)
+	}
+
+	wg.Wait()
+	close(c)
+
+	<-done
 	ss.Print()
 }

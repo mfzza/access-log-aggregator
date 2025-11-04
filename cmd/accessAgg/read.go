@@ -6,37 +6,43 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync"
 )
 
-func processFiles(files []string) accesslog.Summaries {
-	ss := accesslog.Summaries{}
+func processFiles(c chan<- accesslog.Record, file string, wg *sync.WaitGroup) {
+	defer wg.Done()
 
-	// TODO: replace this loop with goroutines
-	for _, file := range files {
-		r, err := logreader.NewReader(file)
+	r, err := logreader.NewReader(file)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to read file: %v\n", err)
+		os.Exit(1)
+	}
+	defer r.Close()
+
+	for {
+		line, err := r.ReadLine()
+		if err == io.EOF {
+			break
+		}
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to read file: %v\n", err)
+			fmt.Fprintf(os.Stderr, "%v\n", err)
 			os.Exit(1)
 		}
-		for {
-			line, err := r.ReadLine()
-			if err == io.EOF {
-				break
-			}
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "%v\n", err)
-				os.Exit(1)
-			}
 
-			record, err := accesslog.NewRecord(line)
-			if err != nil {
-				// ignore error/malformed/missing field
-				// fmt.Fprintf(os.Stderr, "skipped line: %v\n", err)
-				continue
-			}
-			ss.AddRecord(record)
+		record, err := accesslog.NewRecord(line)
+		if err != nil {
+			// ignore error/malformed/missing field
+			// fmt.Fprintf(os.Stderr, "skipped line: %v\n", err)
+			continue
 		}
-		r.Close()
+		// ss.AddRecord(record)
+		c <- *record
 	}
-	return ss
+}
+
+func aggregateRecord(c <-chan accesslog.Record, ss *accesslog.Summaries, done chan struct{}) {
+	for r := range c {
+		ss.AddRecord(&r)
+	}
+	close(done)
 }
