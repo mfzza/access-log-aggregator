@@ -2,7 +2,7 @@ package main
 
 import (
 	"accessAggregator/internal/accesslog"
-	"bufio"
+	"accessAggregator/internal/logreader"
 	"fmt"
 	"io"
 	"os"
@@ -21,32 +21,30 @@ func main() {
 	// TODO: tail -F like behaviour
 	// TODO: handle graceful exit
 
-	file, err := os.Open(os.Args[1])
+	r, err := logreader.NewReader(os.Args[1])
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error opening a file: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Failed to read file: %v\n", err)
 		os.Exit(1)
 	}
-	defer file.Close()
-	r := bufio.NewReader(file)
+	defer r.Close()
 
 	ss := accesslog.Summaries{}
 	for i := 1; ; i++ {
-		// use scanner?
-		line, err := r.ReadBytes('\n')
+
+		line, err := r.ReadLine()
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "cant read file: %v\n", err)
-			break
+			fmt.Fprintf(os.Stderr, "%v\n", err)
 		}
+
 		record, err := accesslog.NewRecord(line)
 		if err != nil {
-			fmt.Println(err)
+			fmt.Println("Invalid json format, skipped line")
 			continue
 		}
 		ss.AddRecord(record)
 	}
-
 	ss.Print()
 }
