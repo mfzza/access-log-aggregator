@@ -41,7 +41,8 @@ func main() {
 
 		record, err := accesslog.NewRecord(line)
 		if err != nil {
-			fmt.Println("Invalid json format, skipped line")
+			// ignore error/malformed/missing field
+			// fmt.Fprintf(os.Stderr, "skipped line: %v\n", err)
 			continue
 		}
 		ss.AddRecord(record)

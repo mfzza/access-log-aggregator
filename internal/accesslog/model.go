@@ -22,14 +22,17 @@ type Summary struct {
 // type Summaries []Summary
 type Summaries map[string]Summary
 
-// TODO: handle missing field
 func NewRecord(jb []byte) (*Record, error) {
-	var al Record
-	err := json.Unmarshal(jb, &al)
+	var r Record
+	err := json.Unmarshal(jb, &r)
+
+	// NOTE: ignore line should handled on caller
 	if err != nil {
-		// TODO: just skip if malformed, dont return error
 		return nil, fmt.Errorf("invalid JSON: %w", err)
 	}
-	return &al, nil
-}
+	if r.Time.IsZero() || r.Host == "" || r.StatusCode == 0 || r.Duration == 0{
+		return nil, fmt.Errorf("missing or invalid required field")
+	}
 
+	return &r, nil
+}
