@@ -1,10 +1,10 @@
 package accesslog
 
 func (ss Summaries) AddRecord(newRecord *Record) {
-	if s, ok := ss[newRecord.Host]; ok {
-		s.updateSummary(newRecord)
-		ss[newRecord.Host] = s
-		return
+	s, ok := ss[newRecord.Host]
+	if !ok {
+		ss[newRecord.Host] = Summary{}
 	}
-	ss[newRecord.Host] = Summary{}
+	s.updateSummary(newRecord)
+	ss[newRecord.Host] = s
 }
