@@ -10,10 +10,10 @@ func main() {
 	// TODO: tolerate common log rotation
 	// TODO: -interval flag
 	// TODO: tail -F like behaviour
-	// TODO: handle graceful exit
 
 	cfg := parseFlags()
 	ss := accesslog.Summaries{}
+	signalExit(ss)
 
 	c := make(chan accesslog.Record, len(cfg.Files))
 
