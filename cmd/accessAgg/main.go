@@ -14,11 +14,12 @@ func main() {
 	handleShutdownSignal(&ss)
 
 	c := make(chan accesslog.Record, len(flags.Files))
+	ss := accesslog.Summaries{}
 
 	for _, file := range flags.Files {
 		go streamFileRecords(c, file, flags.fromStart)
 	}
-	go aggregateRecords(c, &ss)
+	go aggregateAndPrintSummaries(c, &ss, flags.Interval)
 
 	for {
 		ss.Print()

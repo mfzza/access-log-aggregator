@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"time"
 )
 
 func streamFileRecords(c chan<- accesslog.Record, file string, fromStart bool) {
@@ -39,8 +40,16 @@ func streamFileRecords(c chan<- accesslog.Record, file string, fromStart bool) {
 	}
 }
 
-func aggregateRecords(c <-chan accesslog.Record, ss *accesslog.Summaries) {
-	for r := range c {
-		ss.AddRecord(&r)
-	}
+func aggregateAndPrintSummaries(c <-chan accesslog.Record, ss *accesslog.Summaries, interval time.Duration) {
+    ticker := time.NewTicker(interval)
+    defer ticker.Stop()
+
+    for {
+        select {
+        case r := <-c:
+            ss.AddRecord(&r)
+        case <-ticker.C:
+            ss.Print()
+        }
+    }
 }
