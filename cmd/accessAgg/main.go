@@ -15,7 +15,7 @@ func main() {
 	cfg := parseFlags()
 	ss := accesslog.Summaries{}
 
-	c := make(chan accesslog.Record, 99)
+	c := make(chan accesslog.Record, len(cfg.Files))
 
 	done := make(chan struct{})
 	go aggregateRecord(c, &ss, done)
