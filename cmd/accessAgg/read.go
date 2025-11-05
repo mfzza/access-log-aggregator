@@ -6,11 +6,9 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"sync"
 )
 
-func processFiles(c chan<- accesslog.Record, file string, wg *sync.WaitGroup) {
-	defer wg.Done()
+func processFiles(c chan<- accesslog.Record, file string) {
 
 	r, err := logreader.NewReader(file)
 	if err != nil {
@@ -22,7 +20,8 @@ func processFiles(c chan<- accesslog.Record, file string, wg *sync.WaitGroup) {
 	for {
 		line, err := r.ReadLine()
 		if err == io.EOF {
-			break
+			// break
+			continue
 		}
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%v\n", err)
@@ -40,9 +39,8 @@ func processFiles(c chan<- accesslog.Record, file string, wg *sync.WaitGroup) {
 	}
 }
 
-func aggregateRecord(c <-chan accesslog.Record, ss *accesslog.Summaries, done chan struct{}) {
+func aggregateRecord(c <-chan accesslog.Record, ss *accesslog.Summaries) {
 	for r := range c {
 		ss.AddRecord(&r)
 	}
-	close(done)
 }
