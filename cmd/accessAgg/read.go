@@ -8,9 +8,9 @@ import (
 	"os"
 )
 
-func processFiles(c chan<- accesslog.Record, file string) {
+func processFiles(c chan<- accesslog.Record, file string, fromStart bool) {
 
-	r, err := logreader.NewReader(file)
+	r, err := logreader.NewReader(file, fromStart)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to read file: %v\n", err)
 		os.Exit(1)

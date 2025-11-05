@@ -7,9 +7,7 @@ import (
 )
 
 func main() {
-	// TODO: behaviour to default start read from tail (end of file), and read from beginning when have `-from-start` flag
 	// TODO: tolerate common log rotation
-	// TODO: tail -F like behaviour
 
 	cfg := parseFlags()
 	ss := accesslog.Summaries{}
@@ -18,7 +16,7 @@ func main() {
 	c := make(chan accesslog.Record, len(cfg.Files))
 
 	for _, file := range cfg.Files {
-		go processFiles(c, file)
+		go processFiles(c, file, cfg.fromStart)
 	}
 	go aggregateRecord(c, &ss)
 

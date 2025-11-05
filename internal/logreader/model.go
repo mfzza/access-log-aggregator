@@ -3,7 +3,6 @@ package logreader
 import (
 	"bufio"
 	"fmt"
-	"io"
 	"os"
 )
 
@@ -12,24 +11,17 @@ type Reader struct {
 	buf  *bufio.Reader
 }
 
-func NewReader(fp string) (*Reader, error) {
+func NewReader(fp string, fromStart bool) (*Reader, error) {
 	file, err := os.Open(fp)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to open file: %w", err)
 	}
-	r := bufio.NewReader(file)
-	return &Reader{file: file, buf: r}, nil
-}
-
-func (r *Reader) ReadLine() ([]byte,  error) {
-	line, err := r.buf.ReadBytes('\n')
-	if err == io.EOF {
-		return nil, io.EOF
+	// NOTE: could be added flag -n to more like tail
+	if !fromStart{
+		seekToLastNLines(file, 10)
 	}
-	if err != nil {
-		return nil,  fmt.Errorf("Failed to read line: %w", err)
-	}
-	return line, nil
+	buf := bufio.NewReader(file)
+	return &Reader{file: file, buf: buf}, nil
 }
 
 func (r *Reader) Close() error {
