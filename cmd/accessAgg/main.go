@@ -9,20 +9,20 @@ import (
 func main() {
 	// TODO: tolerate common log rotation
 
-	cfg := parseFlags()
+	flags := parseFlags()
 	ss := accesslog.Summaries{}
-	signalExit(ss)
+	handleShutdownSignal(&ss)
 
-	c := make(chan accesslog.Record, len(cfg.Files))
+	c := make(chan accesslog.Record, len(flags.Files))
 
-	for _, file := range cfg.Files {
-		go processFiles(c, file, cfg.fromStart)
+	for _, file := range flags.Files {
+		go streamFileRecords(c, file, flags.fromStart)
 	}
-	go aggregateRecord(c, &ss)
+	go aggregateRecords(c, &ss)
 
 	for {
 		ss.Print()
 		fmt.Println()
-		time.Sleep(cfg.Interval)
+		time.Sleep(flags.Interval)
 	}
 }

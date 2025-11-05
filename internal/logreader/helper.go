@@ -56,7 +56,7 @@ func seekToLastNLines(f *os.File, n int) {
 	}
 }
 
-func (r *Reader) ReadLine() ([]byte,  error) {
+func (r *Reader) GetRawRecord() ([]byte,  error) {
 	line, err := r.buf.ReadBytes('\n')
 	if err == io.EOF {
 		return nil, io.EOF

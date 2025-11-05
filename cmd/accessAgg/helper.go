@@ -8,7 +8,7 @@ import (
 	"os"
 )
 
-func processFiles(c chan<- accesslog.Record, file string, fromStart bool) {
+func streamFileRecords(c chan<- accesslog.Record, file string, fromStart bool) {
 
 	r, err := logreader.NewReader(file, fromStart)
 	if err != nil {
@@ -18,7 +18,7 @@ func processFiles(c chan<- accesslog.Record, file string, fromStart bool) {
 	defer r.Close()
 
 	for {
-		line, err := r.ReadLine()
+		rawRecord, err := r.GetRawRecord()
 		if err == io.EOF {
 			// break
 			continue
@@ -28,7 +28,7 @@ func processFiles(c chan<- accesslog.Record, file string, fromStart bool) {
 			os.Exit(1)
 		}
 
-		record, err := accesslog.NewRecord(line)
+		record, err := accesslog.NewRecord(rawRecord)
 		if err != nil {
 			// ignore error/malformed/missing field
 			// fmt.Fprintf(os.Stderr, "skipped line: %v\n", err)
@@ -39,7 +39,7 @@ func processFiles(c chan<- accesslog.Record, file string, fromStart bool) {
 	}
 }
 
-func aggregateRecord(c <-chan accesslog.Record, ss *accesslog.Summaries) {
+func aggregateRecords(c <-chan accesslog.Record, ss *accesslog.Summaries) {
 	for r := range c {
 		ss.AddRecord(&r)
 	}

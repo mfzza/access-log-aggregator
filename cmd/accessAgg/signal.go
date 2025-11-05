@@ -8,7 +8,7 @@ import (
 	"syscall"
 )
 
-func signalExit(ss accesslog.Summaries){
+func handleShutdownSignal(ss *accesslog.Summaries){
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
