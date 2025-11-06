@@ -2,7 +2,6 @@ package main
 
 import (
 	"accessAggregator/internal/accesslog"
-	"accessAggregator/internal/logreader"
 	"fmt"
 	"io"
 	"os"
@@ -11,12 +10,18 @@ import (
 
 func streamFileRecords(c chan<- accesslog.Record, file string, fromStart bool) {
 
-	r, err := logreader.NewReader(file, fromStart)
+	f, err := os.Open(file)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to read file: %v\n", err)
+		fmt.Println("Failed to open file:", err)
 		os.Exit(1)
 	}
-	defer r.Close()
+	defer f.Close()
+
+	if !fromStart {
+		SeekToLastNLines(f, 10)
+	}
+
+	r := accesslog.NewReader(f)
 
 	for {
 		rawRecord, err := r.GetRawRecord()
@@ -53,3 +58,54 @@ func aggregateAndPrintSummaries(c <-chan accesslog.Record, ss *accesslog.Summari
         }
     }
 }
+
+func SeekToLastNLines(f *os.File, n int) {
+	if n <= 0 {
+		f.Seek(0, io.SeekEnd)
+		return
+	}
+
+	csize := 512
+	stat, err := f.Stat()
+	if err != nil {
+		return
+	}
+	fsize := stat.Size()
+
+	var linesFound int
+	var offset int64
+
+	for {
+		if fsize-int64(csize)-offset < 0 {
+			csize = int(fsize - offset)
+		}
+
+		offset += int64(csize)
+		if offset > fsize {
+			offset = fsize
+		}
+
+		// Move backward
+		pos := max(fsize-offset, 0)
+		f.Seek(pos, io.SeekStart)
+
+		tmp := make([]byte, csize)
+		f.Read(tmp)
+
+		for i := len(tmp) - 1; i >= 0; i-- {
+			if tmp[i] == '\n' {
+				linesFound++
+				if linesFound > n {
+					f.Seek(pos+int64(i+1), io.SeekStart)
+					return
+				}
+			}
+		}
+
+		if pos == 0 {
+			f.Seek(0, io.SeekEnd)
+			return
+		}
+	}
+}
+

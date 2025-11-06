@@ -1,8 +1,10 @@
 package accesslog
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
 	"time"
 )
 
@@ -22,6 +24,10 @@ type summary struct {
 // type Summaries []Summary
 type Summaries map[string]summary
 
+type Reader struct {
+	reader *bufio.Reader
+}
+
 func NewRecord(rawRecord []byte) (*Record, error) {
 	var r Record
 	err := json.Unmarshal(rawRecord, &r)
@@ -30,9 +36,13 @@ func NewRecord(rawRecord []byte) (*Record, error) {
 	if err != nil {
 		return nil, fmt.Errorf("invalid JSON: %w", err)
 	}
-	if r.Time.IsZero() || r.Host == "" || r.StatusCode == 0 || r.Duration == 0{
+	if r.Time.IsZero() || r.Host == "" || r.StatusCode == 0 || r.Duration == 0 {
 		return nil, fmt.Errorf("missing or invalid required field")
 	}
 
 	return &r, nil
+}
+
+func NewReader(r io.Reader) *Reader {
+	return &Reader{reader: bufio.NewReader(r)}
 }
