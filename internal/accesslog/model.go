@@ -22,9 +22,9 @@ type Summary struct {
 // type Summaries []Summary
 type Summaries map[string]Summary
 
-func NewRecord(jb []byte) (*Record, error) {
+func NewRecord(rawRecord []byte) (*Record, error) {
 	var r Record
-	err := json.Unmarshal(jb, &r)
+	err := json.Unmarshal(rawRecord, &r)
 
 	// NOTE: ignore line should handled on caller
 	if err != nil {
