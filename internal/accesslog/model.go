@@ -13,14 +13,14 @@ type Record struct {
 	Duration   float64   `json:"duration"`
 }
 
-type Summary struct {
+type summary struct {
 	requestTotal int
 	request2xx   int
 	avgDuration  float64 // in seconds
 }
 
 // type Summaries []Summary
-type Summaries map[string]Summary
+type Summaries map[string]summary
 
 func NewRecord(rawRecord []byte) (*Record, error) {
 	var r Record
