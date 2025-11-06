@@ -9,7 +9,6 @@ import (
 )
 
 func main() {
-	// TODO: tolerate common log rotation
 
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, syscall.SIGINT, syscall.SIGTERM)

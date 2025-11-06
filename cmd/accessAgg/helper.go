@@ -11,33 +11,30 @@ import (
 
 func streamFileRecords(c chan<- accesslog.Record, fpath string, fromStart bool) {
 
-	file, err := fileutil.OpenReader(fpath, fromStart)
+	tailFile, err := fileutil.NewTailFile(fpath, fromStart)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	defer file.Close()
-
-	r := accesslog.NewReader(file)
 
 	for {
-		rawRecord, err := r.GetRawRecord()
+		rawRecord, err := tailFile.NextLine()
 		if err == io.EOF {
 			// break
 			continue
 		}
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%v\n", err)
-			os.Exit(1)
+			// os.Exit(1)
+			continue
 		}
 
 		record, err := accesslog.NewRecord(rawRecord)
 		if err != nil {
 			// ignore error/malformed/missing field
-			// fmt.Fprintf(os.Stderr, "skipped line: %v\n", err)
+			fmt.Fprintf(os.Stderr, "skipped line: %v\n", err)
 			continue
 		}
-		// ss.AddRecord(record)
 		c <- *record
 	}
 }

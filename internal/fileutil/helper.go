@@ -1,22 +1,11 @@
 package fileutil
 
 import (
-	"fmt"
 	"io"
 	"os"
 )
 
-func OpenReader(fpath string, fromStart bool) ( *os.File, error ) {
-	file, err := os.Open(fpath)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to open file: %w", err)
-	}
-	if !fromStart {
-		seekToLastNLines(file, 10)
-	}
-	return file, nil
-}
-
+// FIXME: should return max line if file lines is < n
 func seekToLastNLines(f *os.File, n int) {
 	if n <= 0 {
 		f.Seek(0, io.SeekEnd)
