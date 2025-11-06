@@ -13,8 +13,9 @@ func (s *summary) updateSummary(newRecord *Record) {
 func (ss Summaries) AddRecord(newRecord *Record) {
 	s, ok := ss[newRecord.Host]
 	if !ok {
-		ss[newRecord.Host] = summary{}
+		s = summary{}
 	}
+	// wether it new or not, it still need to update
 	s.updateSummary(newRecord)
 	ss[newRecord.Host] = s
 }

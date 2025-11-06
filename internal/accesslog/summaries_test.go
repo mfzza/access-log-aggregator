@@ -203,3 +203,62 @@ func TestSummary_updateSummary_multipleRecords(t *testing.T) {
 		})
 	}
 }
+
+func TestSummaries_AddRecord(t *testing.T) {
+	tests := []struct {
+		name string // description of this test case
+		// Named input parameters for target function.
+		summaries Summaries
+		newRecord *Record
+		want      Summaries
+	}{
+		{name: "new host on empty summaries",
+			summaries: Summaries{},
+			newRecord: &Record{
+				Time:       time.Date(2025, 8, 14, 2, 7, 12, 680651416, time.UTC),
+				Host:       "chatgpt.com",
+				StatusCode: 299,
+				Duration:   0.224254673,
+			},
+			want: Summaries{"chatgpt.com": {requestTotal: 1, request2xx: 1, avgDuration: 0.224254673}},
+		},
+		{name: "existing host on existing summaries",
+			summaries: Summaries{"chatgpt.com": {requestTotal: 1, request2xx: 1, avgDuration: 0.224254673}},
+			newRecord: &Record{
+				Time:       time.Date(2025, 8, 14, 2, 7, 12, 680651416, time.UTC),
+				Host:       "chatgpt.com",
+				StatusCode: 300,
+				Duration:   0.224254673,
+			},
+			want: Summaries{"chatgpt.com": {requestTotal: 2, request2xx: 1, avgDuration: 0.224254673}},
+		},
+		{name: "new host on existing summaries",
+			summaries: Summaries{"chatgpt.com": {requestTotal: 1, request2xx: 1, avgDuration: 0.224254673}},
+			newRecord: &Record{
+				Time:       time.Date(2025, 8, 14, 2, 7, 12, 680651416, time.UTC),
+				Host:       "substrate.office.com",
+				StatusCode: 300,
+				Duration:   0.224254673,
+			},
+			want: Summaries{"chatgpt.com": {requestTotal: 1, request2xx: 1, avgDuration: 0.224254673}, "substrate.office.com": {requestTotal: 1, request2xx: 0, avgDuration: 0.224254673}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.summaries.AddRecord(tt.newRecord)
+			if len(tt.summaries) != len(tt.want) {
+				t.Fatalf("expected map length %d, tt.summaries %d", len(tt.want), len(tt.summaries))
+			}
+			for k, v := range tt.want {
+				gv, ok := tt.summaries[k]
+				if !ok {
+					t.Errorf("missing key %q", k)
+					continue
+				}
+				if gv != v {
+					t.Errorf("for key %q, tt.summaries %+v, want %+v", k, gv, v)
+				}
+			}
+		})
+	}
+}
