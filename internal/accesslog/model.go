@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"io"
 	"time"
 )
 
@@ -41,8 +40,4 @@ func NewRecord(rawRecord []byte) (*Record, error) {
 	}
 
 	return &r, nil
-}
-
-func NewReader(r io.Reader) *Reader {
-	return &Reader{reader: bufio.NewReader(r)}
 }
