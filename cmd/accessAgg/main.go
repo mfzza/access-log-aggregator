@@ -19,7 +19,7 @@ func main() {
 	ss := accesslog.Summaries{}
 
 	for _, file := range flags.Files {
-		go streamFileRecords(c, file, flags.fromStart)
+		go streamFileRecords2(c, file, flags.fromStart)
 	}
 	// FIXME: first run should print instantly
 	go aggregateAndPrintSummaries(c, &ss, flags.Interval)

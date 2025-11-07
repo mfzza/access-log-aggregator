@@ -1,6 +1,8 @@
 package fileutil
 
 import (
+	"bufio"
+	"fmt"
 	"io"
 	"os"
 )
@@ -54,4 +56,54 @@ func seekToLastNLines(f *os.File, n int) {
 			return
 		}
 	}
+}
+
+func NextLine(r *bufio.Reader) ([]byte, error) {
+	line, err := r.ReadBytes('\n')
+	if err == io.EOF {
+		return nil, io.EOF
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to read line: %w", err)
+	}
+	return line, nil
+}
+
+type LogRotate struct {
+	stat      os.FileInfo
+	Truncated bool
+	Renamed   bool
+}
+
+func NewLogRotate(fpath string) (*LogRotate, error) {
+	fstat, err := os.Stat(fpath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get file stat: %w", err)
+	}
+	return &LogRotate{stat: fstat, Truncated: false, Renamed: false}, nil
+}
+
+func (lr *LogRotate) CheckRotation(fpath string) error {
+	currStat, err := os.Stat(fpath)
+	if err != nil {
+		return nil // don’t break the loop
+	}
+
+	// if file inode still same
+	if os.SameFile(currStat, lr.stat) {
+		// and current file size smaller
+		if currStat.Size() < lr.stat.Size() {
+			lr.stat = currStat
+			lr.Renamed = false
+			lr.Truncated = true
+			return nil
+			// NOTE: return FileInfo, bool seek
+		}
+	} else {
+		lr.stat = currStat
+		lr.Renamed = true
+		lr.Truncated = false
+		return nil
+	}
+	return nil
 }

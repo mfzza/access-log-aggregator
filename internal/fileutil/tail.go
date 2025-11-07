@@ -21,8 +21,13 @@ type TailFile struct {
 	rotated  bool
 }
 
+var OpenFile = func(fpath string) (FileSource, error) {
+	return os.Open(fpath)
+}
+
 func NewTailFile(fpath string, fromStart bool) (*TailFile, error) {
-	f, err := os.Open(fpath)
+	// f, err := os.Open(fpath)
+	f, err := OpenFile(fpath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file: %w", err)
 	}
@@ -37,7 +42,11 @@ func NewTailFile(fpath string, fromStart bool) (*TailFile, error) {
 		return nil, fmt.Errorf("failed to get file stat: %w", err)
 	}
 
-	return &TailFile{fpath: fpath, file: f, fileInfo: stat, reader: bufio.NewReader(f)}, nil
+	return &TailFile{fpath: fpath,
+			file:     f,
+			fileInfo: stat,
+			reader:   bufio.NewReader(f)},
+		nil
 }
 
 func (t *TailFile) Close() error {
