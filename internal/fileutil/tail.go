@@ -34,7 +34,7 @@ func (t *TailFile) NextLine() ([]byte, error) {
 	if err == io.EOF {
 		time.Sleep(200 * time.Millisecond)
 		if err := t.checkRotation(); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to detect log file rotation: %w", err)
 		}
 		return nil, io.EOF
 	}
@@ -68,7 +68,7 @@ func (t *TailFile) checkRotation() error {
 			t.file.Close()
 			f, err := os.Open(t.fpath)
 			if err != nil {
-				return err
+				return fmt.Errorf("cant open new log file")
 			}
 			t.file = f
 			t.fileInfo = current
