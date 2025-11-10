@@ -13,30 +13,29 @@ type Flags struct {
 	Interval  time.Duration
 }
 
-func parseFlags() Flags {
+func parseFlags() (Flags, error) {
 	var flags Flags
 	seen := map[string]bool{}
-	flag.Func("file", "path to log file (required)\ncan be specified multiple time, example: -file a.log -file b.log",
-		func(file string) error {
-			if seen[file] {
-				return fmt.Errorf("duplicate file: %s", file) // or emit error?
-				// return nil // skip
-			}
-			seen[file] = true
-			flags.Files = append(flags.Files, file)
-			return nil
 
-		})
+	flag.Func("file", "path to log file", func(file string) error {
+		if seen[file] {
+			return fmt.Errorf("duplicate file: %s", file)
+		}
+		seen[file] = true
+		flags.Files = append(flags.Files, file)
+		return nil
+	})
 
-	flag.BoolVar(&flags.fromStart, "from-start", false, "optional: read from beginning (default: tail from end)")
-	flag.DurationVar(&flags.Interval, "interval", 10*time.Second, "optional: summary interval")
+	flag.BoolVar(&flags.fromStart, "from-start", false, "read from beginning")
+	flag.DurationVar(&flags.Interval, "interval", 10*time.Second, "summary interval")
 
-	flag.Parse()
-	if len(flags.Files) == 0 {
-		fmt.Fprintln(os.Stderr, "missing required flag: at least one -file <path> must be provided")
-		flag.Usage()
-		os.Exit(2)
+	if err := flag.CommandLine.Parse(os.Args[1:]); err != nil {
+		return Flags{}, err
 	}
-	return flags
-}
 
+	if len(flags.Files) == 0 {
+		return Flags{}, fmt.Errorf("missing required flag: at least one -file must be provided")
+	}
+
+	return flags, nil
+}

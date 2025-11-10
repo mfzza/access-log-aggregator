@@ -3,6 +3,7 @@ package main
 import (
 	"accessAggregator/internal/accesslog"
 	"context"
+	"flag"
 	"fmt"
 	"os"
 	"os/signal"
@@ -12,7 +13,12 @@ import (
 
 func main() {
 
-	flags := parseFlags()
+	flags, err := parseFlags()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Error:", err)
+		flag.Usage()
+		os.Exit(2)
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
