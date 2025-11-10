@@ -2,27 +2,38 @@ package main
 
 import (
 	"accessAggregator/internal/accesslog"
+	"context"
 	"fmt"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 )
 
 func main() {
 
+	flags := parseFlags()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, syscall.SIGINT, syscall.SIGTERM)
 
-	flags := parseFlags()
-
-	c := make(chan accesslog.Record, len(flags.Files))
+	rawRecord := make(chan []byte, len(flags.Files))
 	ss := accesslog.Summaries{}
 
+	var wg sync.WaitGroup
+
 	for _, file := range flags.Files {
-		go streamFileRecords(c, file, flags.fromStart)
+		wg.Go(func () {
+			streamLogFile(file, flags.fromStart, ctx, rawRecord)
+		})
 	}
 	// FIXME: first run should print instantly
-	go aggregateAndPrintSummaries(c, &ss, flags.Interval)
+	wg.Go(func ()  {
+		aggregateAndPrintSumaries(&ss, flags.Interval, ctx, rawRecord)
+	})
 
 	sig := <-done
 	fmt.Println()
@@ -30,5 +41,7 @@ func main() {
 	fmt.Println()
 	fmt.Printf("Received signal: %s.\n", sig)
 	fmt.Println("Gracefully shutting down... Printing final summary")
-	ss.Print()
+
+	cancel()
+	wg.Wait()
 }
