@@ -21,33 +21,35 @@ func main() {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, syscall.SIGINT, syscall.SIGTERM)
 
-	rawRecord := make(chan []byte, len(flags.Files))
+	rawRecord := make(chan []byte, 100)
 	ss := accesslog.Summaries{}
 
 	var wg sync.WaitGroup
 
 	for _, file := range flags.Files {
-		wg.Go(func () {
-			streamLogFile(file, flags.fromStart, ctx, rawRecord)
+		wg.Go(func() {
+			if err := streamLogFile(file, flags.fromStart, ctx, rawRecord); err != nil {
+				fmt.Printf("Error tailing %s: %v\n", file, err)
+			}
 		})
 	}
-	// FIXME: first run should print instantly
-	wg.Go(func ()  {
+	wg.Go(func() {
 		aggregateAndPrintSumaries(&ss, flags.Interval, ctx, rawRecord)
 	})
 
 	sig := <-done
+	cancel()
 	fmt.Println()
 	fmt.Println()
 	fmt.Println()
 	fmt.Printf("Received signal: %s.\n", sig)
 	fmt.Println("Gracefully shutting down... Printing final summary")
-
-	cancel()
+	ss.Print()
 	wg.Wait()
+	os.Exit(0)
+	fmt.Println("EXIT")
 }

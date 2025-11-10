@@ -29,7 +29,7 @@ type TailFile struct {
 func NewTailFile(fpath string, file FileSrc, delay time.Duration) (*TailFile, error) {
 	stat, err := file.Stat()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get file stat: %w", err)
 	}
 	return &TailFile{fpath: fpath, file: file, reader: bufio.NewReader(file), fstat: stat, delay: delay}, nil
 }
@@ -43,7 +43,7 @@ func (t *TailFile) GetRawRecord() ([]byte, error) {
 	if err == io.EOF {
 		time.Sleep(t.delay)
 		if err := t.checkRotation(); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to detect rotation: %w", err)
 		}
 		return nil, io.EOF
 	}
@@ -88,7 +88,7 @@ func (t *TailFile) checkRotation() error {
 			t.file.Close()
 			newFile, err := t.file.Open(t.fpath)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to reopen file: %w", err)
 			}
 			t.file = newFile
 			t.reader.Reset(newFile)

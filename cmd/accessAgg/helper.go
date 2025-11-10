@@ -6,39 +6,36 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"time"
 )
 
-func streamLogFile(fpath string, fromStart bool, ctx context.Context, rawRecords chan<- []byte) {
+func streamLogFile(fpath string, fromStart bool, ctx context.Context, rawRecords chan<- []byte) error {
 	f, err := tailer.NewOSFile(fpath, fromStart)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return fmt.Errorf("Failed to open file: %w", err)
 	}
 	tf, err := tailer.NewTailFile(fpath, f, 200*time.Millisecond)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
 	defer tf.Close()
 
 	for {
 		select {
 		case <-ctx.Done():
-			return
+			return nil
 		default:
 			rawRecord, err := tf.GetRawRecord()
 			if err == io.EOF {
 				continue
 			}
 			if err != nil {
-				return
+				return fmt.Errorf("failed to read record: %w", err)
 			}
 			select {
 			case rawRecords <- rawRecord:
 			case <-ctx.Done():
-				return
+				return nil
 			}
 		}
 	}
@@ -50,7 +47,10 @@ func aggregateAndPrintSumaries(ss *accesslog.Summaries, interval time.Duration, 
 
 	for {
 		select {
-		case r := <-rawRecords:
+		case r, ok := <-rawRecords:
+			if !ok {
+				return
+			}
 			record, err := accesslog.NewRecord(r)
 			if err != nil {
 				continue
@@ -59,8 +59,8 @@ func aggregateAndPrintSumaries(ss *accesslog.Summaries, interval time.Duration, 
 		case <-ticker.C:
 			ss.Print()
 		case <-ctx.Done():
-			ss.Print()
 			return
 		}
 	}
 }
+
