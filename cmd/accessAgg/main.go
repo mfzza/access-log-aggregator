@@ -29,11 +29,12 @@ func main() {
 	ss := accesslog.Summaries{}
 
 	var tailWG sync.WaitGroup
+	errCh := make(chan error, len(flags.Files))
 
 	for _, file := range flags.Files {
 		tailWG.Go(func() {
 			if err := streamLogFile(file, flags.fromStart, ctx, rawRecord); err != nil {
-				fmt.Printf("Error tailing %s: %v\n", file, err)
+				errCh <- fmt.Errorf("[%s] error tailing: %w\n", file, err)
 			}
 		})
 	}
@@ -58,6 +59,8 @@ func main() {
 
 	aggWG.Wait()
 
-	wg.Wait()
+	for err := range errCh {
+		fmt.Fprintln(os.Stderr, err)
+	}
 	os.Exit(0)
 }

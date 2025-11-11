@@ -12,7 +12,7 @@ import (
 func streamLogFile(fpath string, fromStart bool, ctx context.Context, rawRecords chan<- []byte) error {
 	f, err := tailer.NewOSFile(fpath, fromStart)
 	if err != nil {
-		return fmt.Errorf("Failed to open file: %w", err)
+		return fmt.Errorf("opening file: %w", err)
 	}
 	tf, err := tailer.NewTailFile(fpath, f, 200*time.Millisecond)
 	if err != nil {
@@ -30,7 +30,7 @@ func streamLogFile(fpath string, fromStart bool, ctx context.Context, rawRecords
 				continue
 			}
 			if err != nil {
-				return fmt.Errorf("failed to read record: %w", err)
+				return fmt.Errorf("reading record: %w", err)
 			}
 			select {
 			case rawRecords <- rawRecord:
