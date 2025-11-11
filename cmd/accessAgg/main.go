@@ -28,28 +28,36 @@ func main() {
 	rawRecord := make(chan []byte, 100)
 	ss := accesslog.Summaries{}
 
-	var wg sync.WaitGroup
+	var tailWG sync.WaitGroup
 
 	for _, file := range flags.Files {
-		wg.Go(func() {
+		tailWG.Go(func() {
 			if err := streamLogFile(file, flags.fromStart, ctx, rawRecord); err != nil {
 				fmt.Printf("Error tailing %s: %v\n", file, err)
 			}
 		})
 	}
-	wg.Go(func() {
-		aggregateAndPrintSumaries(&ss, flags.Interval, ctx, rawRecord)
+
+	var aggWG sync.WaitGroup
+
+	aggWG.Go(func() {
+		aggregateAndPrintSummaries(&ss, flags.Interval, rawRecord)
 	})
 
 	sig := <-done
 	cancel()
+	tailWG.Wait()
+	close(errCh)
+	close(rawRecord)
+
 	fmt.Println()
 	fmt.Println()
 	fmt.Println()
 	fmt.Printf("Received signal: %s.\n", sig)
 	fmt.Println("Gracefully shutting down... Printing final summary")
-	ss.Print()
+
+	aggWG.Wait()
+
 	wg.Wait()
 	os.Exit(0)
-	fmt.Println("EXIT")
 }

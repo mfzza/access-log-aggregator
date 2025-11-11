@@ -41,7 +41,7 @@ func streamLogFile(fpath string, fromStart bool, ctx context.Context, rawRecords
 	}
 }
 
-func aggregateAndPrintSumaries(ss *accesslog.Summaries, interval time.Duration, ctx context.Context, rawRecords <-chan []byte) {
+func aggregateAndPrintSummaries(ss *accesslog.Summaries, interval time.Duration, rawRecords <-chan []byte) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
@@ -49,6 +49,7 @@ func aggregateAndPrintSumaries(ss *accesslog.Summaries, interval time.Duration, 
 		select {
 		case r, ok := <-rawRecords:
 			if !ok {
+				ss.Print()
 				return
 			}
 			record, err := accesslog.NewRecord(r)
@@ -56,11 +57,9 @@ func aggregateAndPrintSumaries(ss *accesslog.Summaries, interval time.Duration, 
 				continue
 			}
 			ss.AddRecord(record)
+
 		case <-ticker.C:
 			ss.Print()
-		case <-ctx.Done():
-			return
 		}
 	}
 }
-
