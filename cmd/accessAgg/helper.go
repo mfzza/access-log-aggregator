@@ -21,6 +21,10 @@ func streamLogFile(fpath string, fromStart bool, ctx context.Context, rawRecords
 	}
 	defer tf.Close()
 
+	return runStreamLoop(tf, ctx, rawRecords)
+}
+
+func runStreamLoop(tf tailer.Tailer, ctx context.Context, rawRecords chan<- []byte) error {
 	for {
 		select {
 		case <-ctx.Done():
@@ -42,7 +46,7 @@ func streamLogFile(fpath string, fromStart bool, ctx context.Context, rawRecords
 	}
 }
 
-func aggregateAndPrintSummaries(ss *accesslog.Summaries, flags *Flags, rawRecords <-chan []byte, errCh <-chan error) bool {
+func aggregateAndPrintSummaries(ss accesslog.Summarieses, flags *Flags, rawRecords <-chan []byte, errCh <-chan error) bool {
 	ticker := time.NewTicker(flags.Interval)
 	defer ticker.Stop()
 
@@ -62,6 +66,9 @@ func aggregateAndPrintSummaries(ss *accesslog.Summaries, flags *Flags, rawRecord
 			fmt.Fprintln(os.Stderr, err)
 		}
 	}
+
+	// HACK: dirty fix for instant oneshot
+	time.AfterFunc(10*time.Millisecond, printSummaries)
 
 	for {
 		select {

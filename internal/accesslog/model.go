@@ -36,3 +36,12 @@ func NewRecord(rawRecord []byte) (*Record, error) {
 
 	return &r, nil
 }
+
+type Summarieses interface {
+	AddRecord(r *Record)
+	Print()
+}
+
+func NewSummaries() Summaries {
+	return make(Summaries)
+}

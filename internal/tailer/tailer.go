@@ -17,6 +17,11 @@ type FileSrc interface {
 	Open(name string) (FileSrc, error)
 }
 
+type Tailer interface {
+	GetRawRecord() ([]byte, error)
+	Close() error
+}
+
 type TailFile struct {
 	fpath   string
 	file    FileSrc

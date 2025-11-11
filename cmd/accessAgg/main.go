@@ -1,5 +1,3 @@
-// TODO: integration testing
-// TODO: better error handling
 package main
 
 import (
@@ -28,7 +26,8 @@ func main() {
 	rawRecord := make(chan []byte, 100)
 	ctx, cancel := context.WithCancel(context.Background())
 
-	ss := accesslog.Summaries{}
+	// ss := accesslog.Summaries{}
+	ss := accesslog.NewSummaries()
 
 	var tailWG sync.WaitGroup
 
