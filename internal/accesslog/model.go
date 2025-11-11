@@ -1,7 +1,6 @@
 package accesslog
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -22,10 +21,6 @@ type summary struct {
 
 // type Summaries []Summary
 type Summaries map[string]summary
-
-type Reader struct {
-	reader *bufio.Reader
-}
 
 func NewRecord(rawRecord []byte) (*Record, error) {
 	var r Record
