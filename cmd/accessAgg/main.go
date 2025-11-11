@@ -1,3 +1,5 @@
+// TODO: integration testing
+// TODO: better error handling
 package main
 
 import (
@@ -12,7 +14,6 @@ import (
 )
 
 func main() {
-
 	flags, err := parseFlags()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Error:", err)
@@ -20,47 +21,50 @@ func main() {
 		os.Exit(2)
 	}
 
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+
+	errCh := make(chan error, len(flags.Files))
+	rawRecord := make(chan []byte, 100)
 	ctx, cancel := context.WithCancel(context.Background())
 
-	done := make(chan os.Signal, 1)
-	signal.Notify(done, syscall.SIGINT, syscall.SIGTERM)
-
-	rawRecord := make(chan []byte, 100)
 	ss := accesslog.Summaries{}
 
 	var tailWG sync.WaitGroup
-	errCh := make(chan error, len(flags.Files))
 
 	for _, file := range flags.Files {
 		tailWG.Go(func() {
 			if err := streamLogFile(file, flags.fromStart, ctx, rawRecord); err != nil {
-				errCh <- fmt.Errorf("[%s] error tailing: %w\n", file, err)
+				errorStream := fmt.Errorf("[%s] error tailing: %w", file, err)
+				errCh <- errorStream
 			}
 		})
 	}
 
+	exitCh := make(chan struct{})
 	var aggWG sync.WaitGroup
 
 	aggWG.Go(func() {
-		aggregateAndPrintSummaries(&ss, flags.Interval, rawRecord)
+		if ok := aggregateAndPrintSummaries(&ss, &flags, rawRecord, errCh); !ok {
+			exitCh <- struct{}{}
+		}
 	})
 
-	sig := <-done
-	cancel()
-	tailWG.Wait()
-	close(errCh)
-	close(rawRecord)
+	select {
+	case <-exitCh:
+		fmt.Fprintln(os.Stderr, "failed to process all file, shutting down...")
+		os.Exit(1)
 
-	fmt.Println()
-	fmt.Println()
-	fmt.Println()
-	fmt.Printf("Received signal: %s.\n", sig)
-	fmt.Println("Gracefully shutting down... Printing final summary")
+	case sig := <-sigCh:
+		cancel()
+		tailWG.Wait()
 
-	aggWG.Wait()
+		fmt.Printf("\n\n\nReceived signal: %s.\n", sig)
+		fmt.Println("Gracefully shutting down... Printing final summary")
 
-	for err := range errCh {
-		fmt.Fprintln(os.Stderr, err)
+		close(errCh)
+		close(rawRecord)
+
+		aggWG.Wait()
 	}
-	os.Exit(0)
 }
