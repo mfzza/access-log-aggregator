@@ -1,271 +1,333 @@
+// tailer_test.go
 package tailer
 
 import (
+	"errors"
 	"io"
 	"os"
+	"strings"
 	"testing"
 	"time"
 )
 
-func TestTailFile_GetRawRecord(t *testing.T) {
-	mockFile := NewMockFile([]byte("line1\nline2\nline3\n"), "test.log")
-	tailer, err := NewTailFile("test.log", mockFile, 10*time.Millisecond)
-	if err != nil {
-		t.Fatalf("Failed to create tailer: %v", err)
-	}
-	defer tailer.Close()
-
-	// Test reading lines
-	line, err := tailer.GetRawRecord()
-	if err != nil {
-		t.Fatalf("Failed to read line: %v", err)
-	}
-	if string(line) != "line1\n" {
-		t.Errorf("Expected 'line1\\n', got '%s'", string(line))
-	}
-
-	line, err = tailer.GetRawRecord()
-	if err != nil {
-		t.Fatalf("Failed to read line: %v", err)
-	}
-	if string(line) != "line2\n" {
-		t.Errorf("Expected 'line2\\n', got '%s'", string(line))
-	}
-}
-
-func TestTailFile_EOF_Retry(t *testing.T) {
-	mockFile := NewMockFile([]byte("line1\n"), "test.log")
-	tailer, err := NewTailFile("test.log", mockFile, 5*time.Millisecond)
-	if err != nil {
-		t.Fatalf("Failed to create tailer: %v", err)
-	}
-	defer tailer.Close()
-
-	// Read the only line
-	line, err := tailer.GetRawRecord()
-	if err != nil {
-		t.Fatalf("Failed to read line: %v", err)
-	}
-	if string(line) != "line1\n" {
-		t.Errorf("Expected 'line1\\n', got '%s'", string(line))
+func TestNewTailFile(t *testing.T) {
+	tests := []struct {
+		name      string
+		setupFS   func() *mockFileSystem
+		fromStart bool
+		wantErr   bool
+	}{
+		{
+			name: "successful creation from start",
+			setupFS: func() *mockFileSystem {
+				fs := newMockFileSystem()
+				fs.files["test.log"] = newMockFile([]byte("line1\nline2\n"))
+				return fs
+			},
+			fromStart: true,
+			wantErr:   false,
+		},
+		{
+			name: "successful creation from end",
+			setupFS: func() *mockFileSystem {
+				fs := newMockFileSystem()
+				fs.files["test.log"] = newMockFile([]byte("line1\nline2\n"))
+				return fs
+			},
+			fromStart: false,
+			wantErr:   false,
+		},
+		{
+			name: "file not found",
+			setupFS: func() *mockFileSystem {
+				return newMockFileSystem() // empty, no files
+			},
+			wantErr: true,
+		},
 	}
 
-	// Next read should return EOF but not break
-	start := time.Now()
-	line, err = tailer.GetRawRecord()
-	if err != io.EOF {
-		t.Errorf("Expected EOF, got %v", err)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fs := tt.setupFS()
+			tailer, err := NewTailFile("test.log", fs, tt.fromStart, 100*time.Millisecond)
 
-	// Should have delayed
-	if time.Since(start) < 5*time.Millisecond {
-		t.Error("Should have delayed on EOF")
-	}
-}
+			if (err != nil) != tt.wantErr {
+				t.Errorf("NewTailFile() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
 
-func TestTailFile_TruncationDetection(t *testing.T) {
-	callCount := 0
-	mockFile := NewMockFile([]byte("original content\n"), "test.log")
+			if err == nil && tailer == nil {
+				t.Error("NewTailFile() returned nil tailer without error")
+			}
 
-	// Simulate file truncation
-	mockFile.NewStatFunc = func(path string) (os.FileInfo, error) {
-		callCount++
-		if callCount == 1 {
-			// First call - normal size
-			return &MockFileInfo{
-				NameVal: path,
-				SizeVal: 18,
-			}, nil
-		}
-		// Second call - truncated
-		return &MockFileInfo{
-			NameVal: path,
-			SizeVal: 0,
-		}, nil
-	}
-
-	tailer, err := NewTailFile("test.log", mockFile, time.Millisecond)
-	if err != nil {
-		t.Fatalf("Failed to create tailer: %v", err)
-	}
-	defer tailer.Close()
-
-	// Simulate EOF to trigger rotation check
-	mockFile.ReadPos = len(mockFile.Content)
-	_, err = tailer.GetRawRecord()
-
-	if err != io.EOF {
-		t.Errorf("Expected EOF, got %v", err)
-	}
-
-	// After truncation detection, should seek to start
-	if mockFile.SeekPos != 0 {
-		t.Errorf("Expected seek to 0 after truncation, got %d", mockFile.SeekPos)
+			if tailer != nil {
+				tailer.Close()
+			}
+		})
 	}
 }
 
-func TestTailFile_RenameDetection(t *testing.T) {
-	callCount := 0
-	mockFile := NewMockFile([]byte("old content\n"), "test.log")
-
-	mockFile.NewStatFunc = func(path string) (os.FileInfo, error) {
-		callCount++
-		if callCount == 1 {
-			// Same file initially
-			return &MockFileInfo{
-				NameVal: "test.log",
-				SizeVal: 12,
-			}, nil
-		}
-		// Different file (renamed)
-		return &MockFileInfo{
-			NameVal: "test.log.1",
-			SizeVal: 12,
-		}, nil
+func TestGetRawRecord(t *testing.T) {
+	tests := []struct {
+		name        string
+		fileContent string
+		wantLines   []string
+		wantEOF     bool
+	}{
+		{
+			name:        "read multiple lines",
+			fileContent: "line1\nline2\nline3\n",
+			wantLines:   []string{"line1\n", "line2\n", "line3\n"},
+			wantEOF:     true,
+		},
+		{
+			name:        "read incomplete line",
+			fileContent: "incomplete line",
+			wantLines:   []string{},
+			wantEOF:     true,
+		},
 	}
 
-	tailer, err := NewTailFile("test.log", mockFile, time.Millisecond)
-	if err != nil {
-		t.Fatalf("Failed to create tailer: %v", err)
-	}
-	defer tailer.Close()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fs := newMockFileSystem()
+			fs.files["test.log"] = newMockFile([]byte(tt.fileContent))
 
-	// First EOF - should detect rotation but not reopen yet
-	mockFile.ReadPos = len(mockFile.Content)
-	_, err = tailer.GetRawRecord()
-	if err != io.EOF {
-		t.Errorf("Expected EOF, got %v", err)
-	}
+			tailer, err := NewTailFile("test.log", fs, true, 10*time.Millisecond)
+			if err != nil {
+				t.Fatalf("Failed to create tailer: %v", err)
+			}
+			defer tailer.Close()
 
-	if !tailer.rotated {
-		t.Error("Should have detected file rotation")
-	}
+			for _, wantLine := range tt.wantLines {
+				line, err := tailer.GetRawRecord()
+				if err != nil {
+					t.Errorf("GetRawRecord() unexpected error: %v", err)
+				}
+				if string(line) != wantLine {
+					t.Errorf("GetRawRecord() = %q, want %q", string(line), wantLine)
+				}
+			}
 
-	// Second EOF - should reopen the file
-	mockFile.OpenFunc = func(name string) (FileSrc, error) {
-		return NewMockFile([]byte("new content\n"), name), nil
-	}
-
-	_, err = tailer.GetRawRecord()
-	if err != io.EOF {
-		t.Errorf("Expected EOF, got %v", err)
-	}
-
-	if !tailer.rotated {
-		t.Error("Should have cleared rotated flag after reopening")
-	}
-}
-
-func TestTailFile_TruncationSeeksToStart(t *testing.T) {
-	callCount := 0
-	mockFile := NewMockFile([]byte("original content\nmore content\n"), "test.log")
-
-	mockFile.NewStatFunc = func(path string) (os.FileInfo, error) {
-		callCount++
-		if callCount == 1 {
-			// First call - normal size (18 bytes)
-			return &MockFileInfo{SizeVal: 18}, nil
-		}
-		// Second call - truncated to 0 bytes
-		return &MockFileInfo{SizeVal: 0}, nil
-	}
-
-	// Track seek calls
-	mockFile.SeekFunc = func(offset int64, whence int) (int64, error) {
-		if offset != 0 || whence != io.SeekStart {
-			t.Errorf("Expected Seek(0, io.SeekStart), got Seek(%d, %d)", offset, whence)
-		}
-		return mockFile.Seek(offset, whence)
-	}
-
-	tailer, err := NewTailFile("test.log", mockFile, time.Millisecond)
-	if err != nil {
-		t.Fatalf("Failed to create tailer: %v", err)
-	}
-	defer tailer.Close()
-
-	// Read first line to establish position
-	line, err := tailer.GetRawRecord()
-	if err != nil {
-		t.Fatalf("Failed to read line: %v", err)
-	}
-	if string(line) != "original content\n" {
-		t.Errorf("Expected 'original content\\n', got '%s'", string(line))
-	}
-
-	// Simulate EOF to trigger rotation check with truncation
-	mockFile.ReadPos = len(mockFile.Content)
-	_, err = tailer.GetRawRecord()
-
-	// Verify reader was reset
-	if mockFile.SeekPos != 0 {
-		t.Errorf("Expected file position to be 0 after truncation, got %d", mockFile.SeekPos)
+			// Test EOF behavior
+			if tt.wantEOF {
+				line, err := tailer.GetRawRecord()
+				if err != io.EOF {
+					t.Errorf("GetRawRecord() error = %v, want EOF", err)
+				}
+				if line != nil {
+					t.Errorf("GetRawRecord() line = %v, want nil on EOF", line)
+				}
+			}
+		})
 	}
 }
 
-func TestTailFile_Close(t *testing.T) {
-	mockFile := NewMockFile([]byte("content\n"), "test.log")
-	tailer, err := NewTailFile("test.log", mockFile, time.Millisecond)
+func TestCheckRotation(t *testing.T) {
+	tests := []struct {
+		name           string
+		initialContent string
+		initialSize    int64
+		newContent     string
+		newSize        int64
+		sameFile       bool
+		wantReset      bool
+		wantReopen     bool
+	}{
+		{
+			name:           "file truncated",
+			initialContent: "line1\nline2\nline3\n",
+			initialSize:    18,
+			newContent:     "new1\n",
+			newSize:        5,
+			sameFile:       true,
+			wantReset:      true,
+			wantReopen:     false,
+		},
+		{
+			name:           "file renamed and new created",
+			initialContent: "line1\nline2\n",
+			initialSize:    12,
+			newContent:     "new1\nnew2\n",
+			newSize:        10,
+			sameFile:       false,
+			wantReset:      false,
+			wantReopen:     true,
+		},
+		{
+			name:           "no rotation",
+			initialContent: "line1\nline2\n",
+			initialSize:    12,
+			newContent:     "line1\nline2\nline3\n",
+			newSize:        18,
+			sameFile:       true,
+			wantReset:      false,
+			wantReopen:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fs := newMockFileSystem()
+
+			// Setup initial file
+			initialFile := newMockFile([]byte(tt.initialContent))
+			initialFile.statFunc = func() (os.FileInfo, error) {
+				return &mockFileInfo{name: "test.log", size: tt.initialSize}, nil
+			}
+			fs.files["test.log"] = initialFile
+
+			tailer, err := NewTailFile("test.log", fs, true, 10*time.Millisecond)
+			if err != nil {
+				t.Fatalf("Failed to create tailer: %v", err)
+			}
+
+			// Setup new file state
+			newFile := newMockFile([]byte(tt.newContent))
+			newFile.statFunc = func() (os.FileInfo, error) {
+				return &mockFileInfo{name: "test.log", size: tt.newSize}, nil
+			}
+
+			// Mock the file system stat to return new file info
+			fs.statFunc = func(name string) (os.FileInfo, error) {
+				return newFile.Stat()
+			}
+
+			// Mock os.SameFile for this test
+			originalSameFile := sameFile
+			sameFile = func(fi1, fi2 os.FileInfo) bool { return tt.sameFile }
+			defer func() { sameFile = originalSameFile }()
+
+			// Mock open for rotation case
+			if tt.wantReopen {
+				fs.openFunc = func(name string) (file, error) {
+					return newFile, nil
+				}
+			}
+
+			err = tailer.checkRotation()
+			if err != nil {
+				t.Errorf("checkRotation() unexpected error: %v", err)
+			}
+
+			// Verify results based on expectations
+			if tt.wantReset {
+				// Should have seeked to start
+				pos, _ := initialFile.Seek(0, io.SeekCurrent)
+				if pos != 0 {
+					t.Error("File should be reset to start after truncation")
+				}
+			}
+
+			if tt.wantReopen {
+				initialStat, _  := initialFile.Stat()
+				if sameFile(tailer.fstat, initialStat) {
+					t.Error("File should be reopened after rotation")
+				}
+			}
+
+			tailer.Close()
+		})
+	}
+}
+
+func TestClose(t *testing.T) {
+	fs := newMockFileSystem()
+	mockFile := newMockFile([]byte("test content"))
+	fs.files["test.log"] = mockFile
+
+	tailer, err := NewTailFile("test.log", fs, true, 10*time.Millisecond)
 	if err != nil {
 		t.Fatalf("Failed to create tailer: %v", err)
 	}
 
 	err = tailer.Close()
 	if err != nil {
-		t.Errorf("Close failed: %v", err)
+		t.Errorf("Close() unexpected error: %v", err)
 	}
 
-	if !mockFile.Closed {
-		t.Error("Underlying file should be closed")
+	if !mockFile.closed {
+		t.Error("Underlying file was not closed")
 	}
 }
 
-func TestTailFile_ErrorHandling(t *testing.T) {
-	// Test with file that errors on NewStat
-	mockFile := NewMockFile([]byte("content\n"), "test.log")
-	mockFile.NewStatFunc = func(path string) (os.FileInfo, error) {
-		return nil, os.ErrNotExist
-	}
+func TestErrorScenarios(t *testing.T) {
+	t.Run("stat error during rotation check", func(t *testing.T) {
+		fs := newMockFileSystem()
+		fs.files["test.log"] = newMockFile([]byte("content"))
 
-	tailer, err := NewTailFile("test.log", mockFile, time.Millisecond)
+		tailer, err := NewTailFile("test.log", fs, true, 10*time.Millisecond)
+		if err != nil {
+			t.Fatalf("Failed to create tailer: %v", err)
+		}
+		defer tailer.Close()
+
+		// Mock stat to return error
+		fs.statFunc = func(name string) (os.FileInfo, error) {
+			return nil, errors.New("stat error")
+		}
+
+		err = tailer.checkRotation()
+		if err != nil {
+			t.Errorf("checkRotation() should handle stat errors gracefully, got: %v", err)
+		}
+	})
+
+	t.Run("reopen error during rotation", func(t *testing.T) {
+		fs := newMockFileSystem()
+		initialFile := newMockFile([]byte("content"))
+		fs.files["test.log"] = initialFile
+
+		tailer, err := NewTailFile("test.log", fs, true, 10*time.Millisecond)
+		if err != nil {
+			t.Fatalf("Failed to create tailer: %v", err)
+		}
+		defer tailer.Close()
+
+		// Setup rotation scenario
+		fs.statFunc = func(name string) (os.FileInfo, error) {
+			return &mockFileInfo{name: "test.log", size: 100}, nil
+		}
+
+		originalSameFile := sameFile
+		sameFile = func(fi1, fi2 os.FileInfo) bool { return false }
+		defer func() { sameFile = originalSameFile }()
+
+		// Mock open to return error
+		fs.openFunc = func(name string) (file, error) {
+			return nil, errors.New("open failed")
+		}
+
+		// First call marks rotated
+		tailer.checkRotation()
+
+		// Second call should try to reopen and fail
+		err = tailer.checkRotation()
+		if err == nil {
+			t.Error("Expected error when reopening fails")
+		}
+	})
+}
+
+// Benchmark test
+func BenchmarkGetRawRecord(b *testing.B) {
+	fs := newMockFileSystem()
+	content := strings.Repeat("test line\n", 1000)
+	fs.files["test.log"] = newMockFile([]byte(content))
+
+	tailer, err := NewTailFile("test.log", fs, true, 0)
 	if err != nil {
-		t.Fatalf("Failed to create tailer: %v", err)
+		b.Fatalf("Failed to create tailer: %v", err)
 	}
 	defer tailer.Close()
 
-	// Should not break on Stat errors during rotation check
-	mockFile.ReadPos = len(mockFile.Content)
-	_, err = tailer.GetRawRecord()
-	// Should get EOF, not the Stat error
-	if err != io.EOF {
-		t.Errorf("Expected EOF, got %v", err)
-	}
-}
-
-func TestWhichRotation(t *testing.T) {
-	file1 := &MockFileInfo{NameVal: "file1", SizeVal: 100}
-	file2 := &MockFileInfo{NameVal: "file2", SizeVal: 50}
-
-	originalSameFile := sameFile
-	defer func() { sameFile = originalSameFile }()
-
-	sameFile = func(fi1, fi2 os.FileInfo) bool { return true }
-	result := whichRotation(file1, file1)
-	if result != same {
-		t.Errorf("Expected same, got %v", result)
-	}
-
-	// Test truncation
-	smallerFile := &MockFileInfo{NameVal: "file1", SizeVal: 50}
-	result = whichRotation(file1, smallerFile)
-	if result != truncated {
-		t.Errorf("Expected truncated, got %v", result)
-	}
-
-	// Test rename
-	sameFile = func(fi1, fi2 os.FileInfo) bool { return false }
-	result = whichRotation(file1, file2)
-	if result != renamed {
-		t.Errorf("Expected renamed, got %v", result)
+	for b.Loop() {
+		_, err := tailer.GetRawRecord()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			b.Fatalf("Unexpected error: %v", err)
+		}
 	}
 }
