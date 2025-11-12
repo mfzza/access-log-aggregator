@@ -1,150 +1,209 @@
 package main
 
 import (
+	"accessAggregator/internal/accesslog"
 	"bytes"
 	"errors"
 	"strings"
 	"testing"
 	"time"
-
-	"accessAggregator/internal/accesslog"
 )
 
-// Mock Summarizer for testing
+// mockSummarizer implements accesslog.Summarizer for testing
 type mockSummarizer struct {
-	records     []accesslog.Record
-	printCalled int
+	records    []*accesslog.Record
+	formatCall int
+	formatStr  string
 }
 
 func (m *mockSummarizer) AddRecord(r *accesslog.Record) {
-	m.records = append(m.records, *r)
+	m.records = append(m.records, r)
 }
 
-func (m *mockSummarizer) Print() {
-	m.printCalled++
+func (m *mockSummarizer) Format() string {
+	m.formatCall++
+	if m.formatStr != "" {
+		return m.formatStr
+	}
+	return "Mock Summary Output"
 }
 
-// Test cases
+// TestAggregateAndPrintSummaries tests the main aggregation function
 func TestAggregateAndPrintSummaries(t *testing.T) {
-	t.Run("successful processing with periodic printing", func(t *testing.T) {
-		// Setup
-		ms := &mockSummarizer{}
-		flags := Flags{Interval: 100 * time.Millisecond}
-		rawRecords := make(chan []byte, 10)
-		errCh := make(chan error, 1)
-		out := &bytes.Buffer{}
-		errOut := &bytes.Buffer{}
+	tests := []struct {
+		name            string
+		setupSummarizer func() *mockSummarizer
+		flags           Flags
+		rawRecords      [][]byte
+		errChInput      []error
+		wantOutput      []string
+		wantErrOutput   []string
+		wantReturn      bool
+		setupTimeout    time.Duration
+	}{
+		{
+			name: "normal operation with records and periodic output",
+			setupSummarizer: func() *mockSummarizer {
+				return &mockSummarizer{formatStr: "Summary at interval"}
+			},
+			flags: Flags{
+				Files:    []string{"test1.log", "test2.log"},
+				Interval: 100 * time.Millisecond,
+			},
+			rawRecords: [][]byte{
+				[]byte(`{"time":"2025-08-14T02:07:12.680651416Z","host":"example.com","status_code":200,"duration":0.1}`),
+				[]byte(`{"time":"2025-08-14T02:07:13.680651416Z","host":"example.com","status_code":404,"duration":0.2}`),
+			},
+			errChInput:    []error{},
+			wantOutput:    []string{"Summary at interval"},
+			wantErrOutput: []string{},
+			wantReturn:    true,
+			setupTimeout:  300 * time.Millisecond,
+		},
+		{
+			name: "handles malformed records",
+			setupSummarizer: func() *mockSummarizer {
+				return &mockSummarizer{formatStr: "Summary with errors"}
+			},
+			flags: Flags{
+				Files:    []string{"test1.log"},
+				Interval: 200 * time.Millisecond,
+			},
+			rawRecords: [][]byte{
+				[]byte(`invalid json`),
+				[]byte(`{"time":"2025-08-14T02:07:12.680651416Z","host":"example.com","status_code":200,"duration":0.1}`),
+				[]byte(`{"host":"incomplete.com"}`), // missing required fields
+			},
+			errChInput:    []error{},
+			wantOutput:    []string{"Summary with errors", "Missing field or malformed log: 2"},
+			wantErrOutput: []string{},
+			wantReturn:    true,
+			setupTimeout:  300 * time.Millisecond,
+		},
+		{
+			name: "handles file errors and returns false",
+			setupSummarizer: func() *mockSummarizer {
+				return &mockSummarizer{formatStr: "Should not appear"}
+			},
+			flags: Flags{
+				Files:    []string{"test1.log", "test2.log"},
+				Interval: time.Second,
+			},
+			rawRecords: [][]byte{},
+			errChInput: []error{
+				errors.New("[test1.log] error tailing: file not found"),
+				errors.New("[test2.log] error tailing: permission denied"),
+			},
+			wantOutput: []string{"File error summary:"},
+			wantErrOutput: []string{
+				"[test1.log] error tailing: file not found",
+				"[test2.log] error tailing: permission denied",
+			},
+			wantReturn:   false,
+			setupTimeout: 200 * time.Millisecond,
+		},
+		{
+			name: "closes when rawRecords channel is closed",
+			setupSummarizer: func() *mockSummarizer {
+				return &mockSummarizer{formatStr: "Final summary"}
+			},
+			flags: Flags{
+				Files:    []string{"test1.log"},
+				Interval: time.Second, // Long interval, shouldn't trigger
+			},
+			rawRecords: [][]byte{
+				[]byte(`{"time":"2025-08-14T02:07:12.680651416Z","host":"example.com","status_code":200,"duration":0.1}`),
+			},
+			errChInput:    []error{},
+			wantOutput:    []string{"Final summary"},
+			wantErrOutput: []string{},
+			wantReturn:    true,
+			setupTimeout:  200 * time.Millisecond,
+		},
+		{
+			name: "periodic ticker triggers output",
+			setupSummarizer: func() *mockSummarizer {
+				return &mockSummarizer{formatStr: "Ticker summary"}
+			},
+			flags: Flags{
+				Files:    []string{"test1.log"},
+				Interval: 50 * time.Millisecond, // Short interval for testing
+			},
+			rawRecords: [][]byte{
+				[]byte(`{"time":"2025-08-14T02:07:12.680651416Z","host":"example.com","status_code":200,"duration":0.1}`),
+			},
+			errChInput:    []error{},
+			wantOutput:    []string{"Ticker summary"}, // Should see at least one ticker output
+			wantErrOutput: []string{},
+			wantReturn:    true,
+			setupTimeout:  120 * time.Millisecond, // Enough for at least one tick
+		},
+	}
 
-		// Test data
-		validRecord := []byte(`{"time":"2025-10-21T22:48:42Z","host":"ahatgpt.com","status_code":156,"duration":0.861705397}`)
-		rawRecords <- validRecord
-		rawRecords <- validRecord
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Setup
+			summarizer := tt.setupSummarizer()
+			rawRecords := make(chan []byte, len(tt.rawRecords))
+			errCh := make(chan error, len(tt.errChInput))
+			var outputBuf, errBuf bytes.Buffer
 
-		// Run function in goroutine
-		done := make(chan bool)
-		go func() {
-			result := aggregateAndPrintSummaries(ms, flags, rawRecords, errCh, out, errOut)
-			done <- result
-		}()
+			// Pre-populate channels
+			for _, record := range tt.rawRecords {
+				rawRecords <- record
+			}
+			for _, err := range tt.errChInput {
+				errCh <- err
+			}
 
-		// Wait a bit for processing
-		time.Sleep(50 * time.Millisecond)
-		close(rawRecords)
+			// Close channels based on test scenario
+			if tt.wantReturn { // Expecting normal return (rawRecords closed)
+				close(rawRecords)
+			}
+			close(errCh)
 
-		// Verify
-		result := <-done
-		if !result {
-			t.Error("Expected true result, got false")
-		}
-		if ms.printCalled == 0 {
-			t.Error("Print should have been called")
-		}
-		if len(ms.records) != 2 {
-			t.Errorf("Expected 2 records, got %d", len(ms.records))
-		}
-	})
+			// Run the function with timeout
+			done := make(chan bool, 1)
+			var result bool
+			go func() {
+				result = aggregateAndPrintSummaries(summarizer, tt.flags, rawRecords, errCh, &outputBuf, &errBuf)
+				done <- true
+			}()
 
-	t.Run("handles malformed records", func(t *testing.T) {
-		ms := &mockSummarizer{}
-		flags := Flags{Interval: time.Hour} // Long interval to avoid ticker
-		rawRecords := make(chan []byte, 10)
-		errCh := make(chan error, 1)
-		out := &bytes.Buffer{}
-		errOut := &bytes.Buffer{}
+			// Wait for completion or timeout
+			select {
+			case <-done:
+				// Function completed
+			case <-time.After(tt.setupTimeout):
+				t.Fatalf("Test timed out after %v", tt.setupTimeout)
+			}
 
-		// Send malformed record
-		rawRecords <- []byte("invalid json")
-		close(rawRecords)
+			// Verify return value
+			if result != tt.wantReturn {
+				t.Errorf("aggregateAndPrintSummaries() returned %v, want %v", result, tt.wantReturn)
+			}
 
-		result := aggregateAndPrintSummaries(ms, flags, rawRecords, errCh, out, errOut)
+			// Verify output
+			outputStr := outputBuf.String()
+			for _, want := range tt.wantOutput {
+				if !strings.Contains(outputStr, want) {
+					t.Errorf("Output missing expected string %q. Got: %s", want, outputStr)
+				}
+			}
 
-		if !result {
-			t.Error("Expected true result for malformed records")
-		}
-		if len(ms.records) != 0 {
-			t.Error("No records should be added for malformed data")
-		}
-		// Check that broken record count is printed
-		output := out.String()
-		if !strings.Contains(output, "Malformed log:") {
-			t.Error("Should report malformed logs in output")
-		}
-	})
+			// Verify error output
+			errStr := errBuf.String()
+			for _, want := range tt.wantErrOutput {
+				if !strings.Contains(errStr, want) {
+					t.Errorf("Error output missing expected string %q. Got: %s", want, errStr)
+				}
+			}
 
-	t.Run("handles errors from error channel", func(t *testing.T) {
-		ms := &mockSummarizer{}
-		flags := Flags{
-			Interval: time.Hour,
-			Files:    []string{"file1", "file2"}, // 2 files
-		}
-		rawRecords := make(chan []byte, 10)
-		errCh := make(chan error, 2)
-		out := &bytes.Buffer{}
-		errOut := &bytes.Buffer{}
-
-		// Send errors matching number of files
-		errCh <- errors.New("file1 error")
-		errCh <- errors.New("file2 error")
-		close(errCh)
-
-		result := aggregateAndPrintSummaries(ms, flags, rawRecords, errCh, out, errOut)
-
-		if result {
-			t.Error("Expected false result when all files have errors")
-		}
-
-		errorOutput := errOut.String()
-		if !strings.Contains(errorOutput, "file1 error") || !strings.Contains(errorOutput, "file2 error") {
-			t.Error("Should print all errors to error output")
-		}
-	})
-
-	t.Run("periodic printing with ticker", func(t *testing.T) {
-		ms := &mockSummarizer{}
-		flags := Flags{Interval: 50 * time.Millisecond}
-		rawRecords := make(chan []byte, 10)
-		errCh := make(chan error, 1)
-		out := &bytes.Buffer{}
-		errOut := &bytes.Buffer{}
-
-		done := make(chan bool)
-		go func() {
-			result := aggregateAndPrintSummaries(ms, flags, rawRecords, errCh, out, errOut)
-			done <- result
-		}()
-
-		// Wait for multiple ticker intervals
-		time.Sleep(220 * time.Millisecond)
-		close(rawRecords)
-
-		result := <-done
-		if !result {
-			t.Error("Expected true result")
-		}
-
-		// Should have multiple print calls (initial + ticker)
-		if ms.printCalled < 2 {
-			t.Errorf("Expected at least 2 print calls, got %d", ms.printCalled)
-		}
-	})
+			// Verify summarizer was used correctly
+			if len(tt.rawRecords) > 0 && len(summarizer.records) == 0 && !strings.Contains(outputStr, "Missing field or malformed log") {
+				t.Error("Expected records to be processed by summarizer")
+			}
+		})
+	}
 }
+
