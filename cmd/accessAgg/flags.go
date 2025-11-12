@@ -13,6 +13,8 @@ type Flags struct {
 	Interval  time.Duration
 }
 
+const defaultInterval = 10
+
 func parseFlags() (Flags, error) {
 	var flags Flags
 	seen := map[string]bool{}
@@ -27,7 +29,7 @@ func parseFlags() (Flags, error) {
 	})
 
 	flag.BoolVar(&flags.fromStart, "from-start", false, "read from beginning")
-	flag.DurationVar(&flags.Interval, "interval", 10*time.Second, "summary interval")
+	flag.DurationVar(&flags.Interval, "interval", defaultInterval*time.Second, "summary interval")
 
 	if err := flag.CommandLine.Parse(os.Args[1:]); err != nil {
 		return Flags{}, err

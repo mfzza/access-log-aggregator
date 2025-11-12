@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"io"
 	"os"
 	"reflect"
 	"strings"
@@ -67,6 +68,10 @@ func TestParseFlags(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Reset flag state for each test
 			flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
+
+			// suppress flag help output
+			flag.CommandLine.SetOutput(io.Discard)
+
 			os.Args = append([]string{"test"}, tt.args...)
 
 			flags, err := parseFlags()
