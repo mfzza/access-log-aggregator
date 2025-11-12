@@ -26,7 +26,6 @@ func main() {
 	rawRecord := make(chan []byte)
 	ctx, cancel := context.WithCancel(context.Background())
 
-	// ss := accesslog.Summaries{}
 	ss := accesslog.NewSummaries()
 
 	var tailWG sync.WaitGroup
@@ -44,7 +43,7 @@ func main() {
 	var aggWG sync.WaitGroup
 
 	aggWG.Go(func() {
-		if ok := aggregateAndPrintSummaries(&ss, flags, rawRecord, errCh, os.Stdout, os.Stderr); !ok {
+		if ok := aggregateAndPrintSummaries(ss, flags, rawRecord, errCh, os.Stdout, os.Stderr); !ok {
 			exitCh <- struct{}{}
 		}
 	})
