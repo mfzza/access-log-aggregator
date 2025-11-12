@@ -23,7 +23,7 @@ func main() {
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
 	errCh := make(chan error, len(flags.Files))
-	rawRecord := make(chan []byte, 100)
+	rawRecord := make(chan []byte)
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// ss := accesslog.Summaries{}

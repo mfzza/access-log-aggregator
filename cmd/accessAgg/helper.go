@@ -27,8 +27,12 @@ func runStreamLoop(tf tailer.Tailer, ctx context.Context, rawRecords chan<- []by
 		default:
 			rawRecord, err := tf.GetRawRecord()
 			if err == io.EOF {
-				time.Sleep(200 * time.Millisecond)
-				continue
+				select {
+				case <-ctx.Done():
+					return nil
+				case <-time.After(200 * time.Millisecond):
+					continue
+				}
 			}
 			if err != nil {
 				return fmt.Errorf("reading record: %w", err)
