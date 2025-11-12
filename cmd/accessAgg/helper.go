@@ -73,8 +73,8 @@ func aggregateAndPrintSummaries(ss accesslog.Summarizer,
 		}
 	}
 
-	// HACK: dirty fix for instant oneshot
-	time.AfterFunc(10*time.Millisecond, printSummaries)
+	// // HACK: dirty fix for instant oneshot
+	// time.AfterFunc(10*time.Millisecond, printSummaries)
 
 	for {
 		select {
