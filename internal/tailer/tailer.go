@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"time"
 )
 
 type fileSystem interface {
@@ -38,11 +37,10 @@ type TailFile struct {
 	reader  *bufio.Reader
 	fstat   os.FileInfo
 	rotated bool
-	delay   time.Duration
 	fs      fileSystem
 }
 
-func NewTailFile(fpath string, fs fileSystem, fromStart bool, delay time.Duration) (*TailFile, error) {
+func NewTailFile(fpath string, fs fileSystem, fromStart bool) (*TailFile, error) {
 	file, err := fs.Open(fpath)
 	if err != nil {
 		return nil, err
@@ -56,7 +54,7 @@ func NewTailFile(fpath string, fs fileSystem, fromStart bool, delay time.Duratio
 	if err != nil {
 		return nil, fmt.Errorf("get file stat: %w", err)
 	}
-	return &TailFile{fpath: fpath, file: file, reader: bufio.NewReader(file), fstat: stat, delay: delay, fs: fs}, nil
+	return &TailFile{fpath: fpath, file: file, reader: bufio.NewReader(file), fstat: stat, fs: fs}, nil
 }
 
 func (t *TailFile) Close() error {
@@ -66,7 +64,6 @@ func (t *TailFile) Close() error {
 func (t *TailFile) GetRawRecord() ([]byte, error) {
 	line, err := t.reader.ReadBytes('\n')
 	if err == io.EOF {
-		time.Sleep(t.delay)
 		if err := t.checkRotation(); err != nil {
 			return nil, fmt.Errorf("detect rotation: %w", err)
 		}

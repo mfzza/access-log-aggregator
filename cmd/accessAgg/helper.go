@@ -10,7 +10,7 @@ import (
 )
 
 func streamLogFile(fpath string, fromStart bool, ctx context.Context, rawRecords chan<- []byte) error {
-	tf, err := tailer.NewTailFile(fpath, tailer.OsFS{}, fromStart, 200*time.Millisecond)
+	tf, err := tailer.NewTailFile(fpath, tailer.OsFS{}, fromStart)
 	if err != nil {
 		return err
 	}
@@ -27,6 +27,7 @@ func runStreamLoop(tf tailer.Tailer, ctx context.Context, rawRecords chan<- []by
 		default:
 			rawRecord, err := tf.GetRawRecord()
 			if err == io.EOF {
+				time.Sleep(200 * time.Millisecond)
 				continue
 			}
 			if err != nil {

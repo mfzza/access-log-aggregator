@@ -5,9 +5,7 @@ import (
 	"errors"
 	"io"
 	"os"
-	"strings"
 	"testing"
-	"time"
 )
 
 func TestNewTailFile(t *testing.T) {
@@ -49,7 +47,7 @@ func TestNewTailFile(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			fs := tt.setupFS()
-			tailer, err := NewTailFile("test.log", fs, tt.fromStart, 100*time.Millisecond)
+			tailer, err := NewTailFile("test.log", fs, tt.fromStart)
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewTailFile() error = %v, wantErr %v", err, tt.wantErr)
@@ -93,7 +91,7 @@ func TestGetRawRecord(t *testing.T) {
 			fs := newMockFileSystem()
 			fs.files["test.log"] = newMockFile([]byte(tt.fileContent))
 
-			tailer, err := NewTailFile("test.log", fs, true, 10*time.Millisecond)
+			tailer, err := NewTailFile("test.log", fs, true)
 			if err != nil {
 				t.Fatalf("Failed to create tailer: %v", err)
 			}
@@ -177,7 +175,7 @@ func TestCheckRotation(t *testing.T) {
 			}
 			fs.files["test.log"] = initialFile
 
-			tailer, err := NewTailFile("test.log", fs, true, 10*time.Millisecond)
+			tailer, err := NewTailFile("test.log", fs, true)
 			if err != nil {
 				t.Fatalf("Failed to create tailer: %v", err)
 			}
@@ -236,7 +234,7 @@ func TestClose(t *testing.T) {
 	mockFile := newMockFile([]byte("test content"))
 	fs.files["test.log"] = mockFile
 
-	tailer, err := NewTailFile("test.log", fs, true, 10*time.Millisecond)
+	tailer, err := NewTailFile("test.log", fs, true)
 	if err != nil {
 		t.Fatalf("Failed to create tailer: %v", err)
 	}
@@ -256,7 +254,7 @@ func TestErrorScenarios(t *testing.T) {
 		fs := newMockFileSystem()
 		fs.files["test.log"] = newMockFile([]byte("content"))
 
-		tailer, err := NewTailFile("test.log", fs, true, 10*time.Millisecond)
+		tailer, err := NewTailFile("test.log", fs, true)
 		if err != nil {
 			t.Fatalf("Failed to create tailer: %v", err)
 		}
@@ -278,7 +276,7 @@ func TestErrorScenarios(t *testing.T) {
 		initialFile := newMockFile([]byte("content"))
 		fs.files["test.log"] = initialFile
 
-		tailer, err := NewTailFile("test.log", fs, true, 10*time.Millisecond)
+		tailer, err := NewTailFile("test.log", fs, true)
 		if err != nil {
 			t.Fatalf("Failed to create tailer: %v", err)
 		}
@@ -307,27 +305,4 @@ func TestErrorScenarios(t *testing.T) {
 			t.Error("Expected error when reopening fails")
 		}
 	})
-}
-
-// Benchmark test
-func BenchmarkGetRawRecord(b *testing.B) {
-	fs := newMockFileSystem()
-	content := strings.Repeat("test line\n", 1000)
-	fs.files["test.log"] = newMockFile([]byte(content))
-
-	tailer, err := NewTailFile("test.log", fs, true, 0)
-	if err != nil {
-		b.Fatalf("Failed to create tailer: %v", err)
-	}
-	defer tailer.Close()
-
-	for b.Loop() {
-		_, err := tailer.GetRawRecord()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			b.Fatalf("Unexpected error: %v", err)
-		}
-	}
 }
