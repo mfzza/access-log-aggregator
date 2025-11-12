@@ -37,7 +37,7 @@ func NewRecord(rawRecord []byte) (*Record, error) {
 	return &r, nil
 }
 
-type Summarieses interface {
+type Summarizer interface {
 	AddRecord(r *Record)
 	Print()
 }

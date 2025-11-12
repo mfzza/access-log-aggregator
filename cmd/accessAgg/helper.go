@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"time"
 )
 
@@ -42,7 +41,7 @@ func runStreamLoop(tf tailer.Tailer, ctx context.Context, rawRecords chan<- []by
 	}
 }
 
-func aggregateAndPrintSummaries(ss accesslog.Summarieses, flags *Flags, rawRecords <-chan []byte, errCh <-chan error) bool {
+func aggregateAndPrintSummaries(ss accesslog.Summarizer, flags *Flags, rawRecords <-chan []byte, errCh <-chan error, out io.Writer, errOut io.Writer) bool {
 	ticker := time.NewTicker(flags.Interval)
 	defer ticker.Stop()
 
@@ -52,14 +51,14 @@ func aggregateAndPrintSummaries(ss accesslog.Summarieses, flags *Flags, rawRecor
 	printSummaries := func() {
 		ss.Print()
 		if brokenRecord > 0 {
-			fmt.Println(" Missing field or Malformed log:", brokenRecord)
+			fmt.Fprintln(out, " Missing field or Malformed log:", brokenRecord)
 		}
 	}
 
 	printErrors := func(errs []error) {
-		fmt.Println("\nFile error summary:")
+		fmt.Fprintln(out, "\nFile error summary:")
 		for _, err := range errs {
-			fmt.Fprintln(os.Stderr, err)
+			fmt.Fprintln(errOut, err)
 		}
 	}
 
@@ -72,7 +71,7 @@ func aggregateAndPrintSummaries(ss accesslog.Summarieses, flags *Flags, rawRecor
 		case err, ok := <-errCh:
 			if ok {
 				errs = append(errs, err)
-				fmt.Fprintln(os.Stderr, err)
+				fmt.Fprintln(errOut, err)
 
 				// and total errors == total files
 				if len(errs) == len(flags.Files) {
