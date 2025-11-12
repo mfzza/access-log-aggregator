@@ -54,10 +54,11 @@ func main() {
 		os.Exit(1)
 
 	case sig := <-sigCh:
+		fmt.Printf("\n\n\nReceived signal: %s.\n", sig)
+
 		cancel()
 		tailWG.Wait()
 
-		fmt.Printf("\n\n\nReceived signal: %s.\n", sig)
 		fmt.Println("Gracefully shutting down... Printing final summary")
 
 		close(errCh)
