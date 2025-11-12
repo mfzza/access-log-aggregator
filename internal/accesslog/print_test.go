@@ -1,6 +1,7 @@
 package accesslog
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -34,7 +35,7 @@ func TestSummaries_format(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := tt.ss.format()
+			got := tt.ss.Format()
 
 			// Check header
 			if !strings.Contains(got, "Access Log Summary") {
@@ -61,3 +62,60 @@ func TestSummaries_format(t *testing.T) {
 	}
 }
 
+func TestSummaries_sort(t *testing.T) {
+	tests := []struct {
+		name    string
+		ss      Summaries
+		want    []string
+		wantMax int
+	}{
+		{
+			name: "empty summaries returns empty slice and base len 2",
+			ss:   Summaries{},
+			want: []string{},
+			// maxHostLen starts 0 + 2 padding
+			wantMax: 2,
+		},
+		{
+			name: "single host",
+			ss: Summaries{
+				"example.com": {},
+			},
+			want:    []string{"example.com"},
+			wantMax: len("example.com") + 2,
+		},
+		{
+			name: "multiple hosts sorted alphabetically",
+			ss: Summaries{
+				"zulu.com":   {},
+				"alpha.com":  {},
+				"middle.org": {},
+			},
+			want:    []string{"alpha.com", "middle.org", "zulu.com"},
+			wantMax: len("middle.org") + 2, // longest key + 2
+		},
+		{
+			name: "hosts with equal length",
+			ss: Summaries{
+				"aaa": {},
+				"ccc": {},
+				"bbb": {},
+			},
+			want:    []string{"aaa", "bbb", "ccc"},
+			wantMax: len("aaa") + 2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, gotMax := tt.ss.sort()
+
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("sort() got hosts = %v, want %v", got, tt.want)
+			}
+			if gotMax != tt.wantMax {
+				t.Errorf("sort() got maxHostLen = %v, want %v", gotMax, tt.wantMax)
+			}
+		})
+	}
+}

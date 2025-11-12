@@ -19,9 +19,6 @@ type summary struct {
 	avgDuration  float64 // in seconds
 }
 
-// type Summaries []Summary
-type Summaries map[string]summary
-
 func NewRecord(rawRecord []byte) (*Record, error) {
 	var r Record
 	err := json.Unmarshal(rawRecord, &r)
@@ -39,8 +36,10 @@ func NewRecord(rawRecord []byte) (*Record, error) {
 
 type Summarizer interface {
 	AddRecord(r *Record)
-	Print()
+	Format() string
 }
+
+type Summaries map[string]summary
 
 func NewSummaries() Summaries {
 	return make(Summaries)

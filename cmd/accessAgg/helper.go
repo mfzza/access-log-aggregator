@@ -60,9 +60,9 @@ func aggregateAndPrintSummaries(ss accesslog.Summarizer,
 
 	brokenRecord := 0
 	printSummaries := func() {
-		ss.Print()
+		fmt.Fprint(out, ss.Format())
 		if brokenRecord > 0 {
-			fmt.Fprintln(out, " Missing field or Malformed log:", brokenRecord)
+			fmt.Fprintln(out, " Missing field or malformed log:", brokenRecord)
 		}
 	}
 
