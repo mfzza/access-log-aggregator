@@ -41,7 +41,13 @@ func runStreamLoop(tf tailer.Tailer, ctx context.Context, rawRecords chan<- []by
 	}
 }
 
-func aggregateAndPrintSummaries(ss accesslog.Summarizer, flags *Flags, rawRecords <-chan []byte, errCh <-chan error, out io.Writer, errOut io.Writer) bool {
+func aggregateAndPrintSummaries(ss accesslog.Summarizer,
+	flags Flags,
+	rawRecords <-chan []byte,
+	errCh <-chan error,
+	out io.Writer,
+	errOut io.Writer) bool {
+
 	ticker := time.NewTicker(flags.Interval)
 	defer ticker.Stop()
 

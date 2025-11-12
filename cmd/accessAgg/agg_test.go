@@ -29,7 +29,7 @@ func TestAggregateAndPrintSummaries(t *testing.T) {
 	t.Run("successful processing with periodic printing", func(t *testing.T) {
 		// Setup
 		ms := &mockSummarizer{}
-		flags := &Flags{Interval: 100 * time.Millisecond}
+		flags := Flags{Interval: 100 * time.Millisecond}
 		rawRecords := make(chan []byte, 10)
 		errCh := make(chan error, 1)
 		out := &bytes.Buffer{}
@@ -66,7 +66,7 @@ func TestAggregateAndPrintSummaries(t *testing.T) {
 
 	t.Run("handles malformed records", func(t *testing.T) {
 		ms := &mockSummarizer{}
-		flags := &Flags{Interval: time.Hour} // Long interval to avoid ticker
+		flags := Flags{Interval: time.Hour} // Long interval to avoid ticker
 		rawRecords := make(chan []byte, 10)
 		errCh := make(chan error, 1)
 		out := &bytes.Buffer{}
@@ -93,7 +93,7 @@ func TestAggregateAndPrintSummaries(t *testing.T) {
 
 	t.Run("handles errors from error channel", func(t *testing.T) {
 		ms := &mockSummarizer{}
-		flags := &Flags{
+		flags := Flags{
 			Interval: time.Hour,
 			Files:    []string{"file1", "file2"}, // 2 files
 		}
@@ -121,7 +121,7 @@ func TestAggregateAndPrintSummaries(t *testing.T) {
 
 	t.Run("periodic printing with ticker", func(t *testing.T) {
 		ms := &mockSummarizer{}
-		flags := &Flags{Interval: 50 * time.Millisecond}
+		flags := Flags{Interval: 50 * time.Millisecond}
 		rawRecords := make(chan []byte, 10)
 		errCh := make(chan error, 1)
 		out := &bytes.Buffer{}

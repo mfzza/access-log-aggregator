@@ -44,7 +44,7 @@ func main() {
 	var aggWG sync.WaitGroup
 
 	aggWG.Go(func() {
-		if ok := aggregateAndPrintSummaries(&ss, &flags, rawRecord, errCh, os.Stdout, os.Stderr); !ok {
+		if ok := aggregateAndPrintSummaries(&ss, flags, rawRecord, errCh, os.Stdout, os.Stderr); !ok {
 			exitCh <- struct{}{}
 		}
 	})
