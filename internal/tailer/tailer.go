@@ -8,14 +8,24 @@ import (
 	"time"
 )
 
-type FileSrc interface {
-	io.Reader
-	io.Seeker
-	io.Closer
-	Stat() (os.FileInfo, error)
-	NewStat(fpath string) (os.FileInfo, error)
-	Open(name string) (FileSrc, error)
+type fileSystem interface {
+	Open(name string) (file, error)
+	Stat(name string) (os.FileInfo, error)
 }
+
+type file interface {
+	io.Closer
+	io.Reader
+	io.ReaderAt
+	io.Seeker
+	Stat() (os.FileInfo, error)
+}
+
+// OsFS implements fileSystem using the local disk.
+type OsFS struct{}
+
+func (OsFS) Open(name string) (file, error)        { return os.Open(name) }
+func (OsFS) Stat(name string) (os.FileInfo, error) { return os.Stat(name) }
 
 type Tailer interface {
 	GetRawRecord() ([]byte, error)
@@ -24,19 +34,29 @@ type Tailer interface {
 
 type TailFile struct {
 	fpath   string
-	file    FileSrc
+	file    file
 	reader  *bufio.Reader
 	fstat   os.FileInfo
 	rotated bool
 	delay   time.Duration
+	fs      fileSystem
 }
 
-func NewTailFile(fpath string, file FileSrc, delay time.Duration) (*TailFile, error) {
+func NewTailFile(fpath string, fs fileSystem, fromStart bool, delay time.Duration) (*TailFile, error) {
+	file, err := fs.Open(fpath)
+	if err != nil {
+		return nil, err
+	}
+
+	if !fromStart {
+		file.Seek(0, io.SeekEnd)
+	}
+
 	stat, err := file.Stat()
 	if err != nil {
 		return nil, fmt.Errorf("get file stat: %w", err)
 	}
-	return &TailFile{fpath: fpath, file: file, reader: bufio.NewReader(file), fstat: stat, delay: delay}, nil
+	return &TailFile{fpath: fpath, file: file, reader: bufio.NewReader(file), fstat: stat, delay: delay, fs: fs}, nil
 }
 
 func (t *TailFile) Close() error {
@@ -79,7 +99,7 @@ func whichRotation(lastStat, currStat os.FileInfo) rotationStatus {
 }
 
 func (t *TailFile) checkRotation() error {
-	currStat, err := t.file.NewStat(t.fpath)
+	currStat, err := t.fs.Stat(t.fpath)
 	if err != nil {
 		return nil // dont break the loop
 	}
@@ -91,18 +111,18 @@ func (t *TailFile) checkRotation() error {
 	case renamed:
 		if t.rotated {
 			t.file.Close()
-			newFile, err := t.file.Open(t.fpath)
+			newFile, err := t.fs.Open(t.fpath)
 			if err != nil {
 				return fmt.Errorf("reopen file: %w", err)
 			}
 			t.file = newFile
 			t.reader.Reset(newFile)
+			t.fstat = currStat
 
 			t.rotated = false
 		}
 		// first, just mark rotation, let it drain old file
 		t.rotated = true
 	}
-	t.fstat = currStat
 	return nil
 }

@@ -11,11 +11,7 @@ import (
 )
 
 func streamLogFile(fpath string, fromStart bool, ctx context.Context, rawRecords chan<- []byte) error {
-	f, err := tailer.NewOSFile(fpath, fromStart)
-	if err != nil {
-		return fmt.Errorf("opening file: %w", err)
-	}
-	tf, err := tailer.NewTailFile(fpath, f, 200*time.Millisecond)
+	tf, err := tailer.NewTailFile(fpath, tailer.OsFS{}, fromStart, 200*time.Millisecond)
 	if err != nil {
 		return err
 	}
