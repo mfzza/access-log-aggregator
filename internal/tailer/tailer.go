@@ -54,6 +54,7 @@ func (t *TailFile) checkRotation() error {
 	case truncated:
 		t.file.Seek(0, io.SeekStart)
 		t.reader.Reset(t.file)
+		t.fstat = currStat
 	case renamed:
 		if t.rotated {
 			t.file.Close()
