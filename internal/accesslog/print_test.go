@@ -18,12 +18,12 @@ func TestSummaries_format(t *testing.T) {
 				"example.com": {
 					requestTotal: 5,
 					request2xx:   4,
-					avgDuration:  0.123,
+					durationTotal:  0.123,
 				},
 				"another.com": {
 					requestTotal: 2,
 					request2xx:   2,
-					avgDuration:  0.456,
+					durationTotal:  0.456,
 				},
 			},
 		},

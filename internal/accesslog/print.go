@@ -41,7 +41,7 @@ func (ss Summaries) Format() string {
 			ss[h].requestTotal,
 			ss[h].request2xx,
 			ss[h].requestTotal-ss[h].request2xx,
-			ss[h].avgDuration)
+			ss[h].durationTotal/float64(ss[h].requestTotal))
 	}
 	fmt.Fprintln(&b, strings.Repeat("=", maxHostLen+72))
 

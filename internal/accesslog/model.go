@@ -14,9 +14,9 @@ type Record struct {
 }
 
 type summary struct {
-	requestTotal int
-	request2xx   int
-	avgDuration  float64 // in seconds
+	requestTotal  int
+	request2xx    int
+	durationTotal float64 // in seconds
 }
 
 func NewRecord(rawRecord []byte) (*Record, error) {
