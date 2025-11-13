@@ -23,7 +23,7 @@ func main() {
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
 	errCh := make(chan error, len(flags.Files))
-	rawRecord := make(chan []byte)
+	rawRecords := make(chan []byte)
 	ctx, cancel := context.WithCancel(context.Background())
 
 	ss := accesslog.NewSummaries()
@@ -32,7 +32,7 @@ func main() {
 
 	for _, file := range flags.Files {
 		tailWG.Go(func() {
-			if err := streamLogFile(file, flags.fromStart, ctx, rawRecord); err != nil {
+			if err := streamLogFile(file, flags.fromStart, ctx, rawRecords); err != nil {
 				errorStream := fmt.Errorf("[%s] error tailing: %w", file, err)
 				errCh <- errorStream
 			}
@@ -43,7 +43,7 @@ func main() {
 	var aggWG sync.WaitGroup
 
 	aggWG.Go(func() {
-		if ok := aggregateAndPrintSummaries(ss, flags, rawRecord, errCh, os.Stdout, os.Stderr); !ok {
+		if ok := aggregateAndPrint(ss, flags, rawRecords, errCh, os.Stdout, os.Stderr); !ok {
 			exitCh <- struct{}{}
 		}
 	})
@@ -61,8 +61,7 @@ func main() {
 
 		fmt.Println("Gracefully shutting down... Printing final summary")
 
-		close(errCh)
-		close(rawRecord)
+		close(rawRecords)
 
 		aggWG.Wait()
 	}
