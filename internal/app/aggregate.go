@@ -36,12 +36,10 @@ func aggr(aggrDone chan<- struct{}, flags config.Flags, data <-chan []byte, summ
 				close(aggrDone)
 				return
 			}
-			record, err := accesslog.NewRecord(r)
-			if err != nil {
+			if err := summaries.Aggregate(r); err != nil {
 				malformRecord++
 				continue
 			}
-			summaries.AddRecord(record)
 		}
 	}
 }

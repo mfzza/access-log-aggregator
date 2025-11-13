@@ -19,3 +19,19 @@ func (ss Summaries) AddRecord(newRecord *Record) {
 	s.updateSummary(newRecord)
 	ss[newRecord.Host] = s
 }
+
+func (ss Summaries) Aggregate(rawRecord []byte) error {
+	newRecord, err := NewRecord(rawRecord)
+	if err != nil {
+		return err
+	}
+
+	s, ok := ss[newRecord.Host]
+	if !ok {
+		s = summary{}
+	}
+	// wether it new or not, it still need to update
+	s.updateSummary(newRecord)
+	ss[newRecord.Host] = s
+	return nil
+}

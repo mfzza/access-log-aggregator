@@ -35,7 +35,7 @@ func NewRecord(rawRecord []byte) (*Record, error) {
 }
 
 type Summarizer interface {
-	AddRecord(r *Record)
+	Aggregate(rawRecord []byte) error
 	Format() string
 }
 
