@@ -26,7 +26,7 @@ func TestSummary_updateSummary(t *testing.T) {
 			want: &summary{
 				requestTotal: 1,
 				request2xx:   1,
-				avgDuration:  0.224254673,
+				durationTotal:  0.224254673,
 			},
 		},
 		{
@@ -41,7 +41,7 @@ func TestSummary_updateSummary(t *testing.T) {
 			want: &summary{
 				requestTotal: 1,
 				request2xx:   0,
-				avgDuration:  0.224254673,
+				durationTotal:  0.224254673,
 			},
 		},
 		{
@@ -56,7 +56,7 @@ func TestSummary_updateSummary(t *testing.T) {
 			want: &summary{
 				requestTotal: 1,
 				request2xx:   0,
-				avgDuration:  0.224254673,
+				durationTotal:  0.224254673,
 			},
 		},
 		{
@@ -71,7 +71,7 @@ func TestSummary_updateSummary(t *testing.T) {
 			want: &summary{
 				requestTotal: 1,
 				request2xx:   0,
-				avgDuration:  0.224254673,
+				durationTotal:  0.224254673,
 			},
 		},
 	}
@@ -85,8 +85,8 @@ func TestSummary_updateSummary(t *testing.T) {
 			if tt.want.request2xx != tt.summary.request2xx {
 				t.Errorf("expected request2xx = %d, got %d", tt.want.request2xx, tt.summary.request2xx)
 			}
-			if math.Abs(tt.want.avgDuration-tt.summary.avgDuration) > 1e-9 {
-				t.Errorf("expected avgDuration = %f, got %f", tt.want.avgDuration, tt.summary.avgDuration)
+			if math.Abs(tt.want.durationTotal-tt.summary.durationTotal) > 1e-9 {
+				t.Errorf("expected avgDuration = %f, got %f", tt.want.durationTotal, tt.summary.durationTotal)
 			}
 		})
 	}
@@ -139,7 +139,7 @@ func TestSummary_updateSummary_multipleRecords(t *testing.T) {
 			want: &summary{
 				requestTotal: 6,
 				request2xx:   3,
-				avgDuration:  0.224254673,
+				durationTotal:  1.345528038,
 			},
 		},
 		{
@@ -181,7 +181,7 @@ func TestSummary_updateSummary_multipleRecords(t *testing.T) {
 			want: &summary{
 				requestTotal: 6,
 				request2xx:   3,
-				avgDuration:  0.398688932,
+				durationTotal:  2.39213359,
 			},
 		},
 	}
@@ -197,8 +197,8 @@ func TestSummary_updateSummary_multipleRecords(t *testing.T) {
 			if tt.want.request2xx != tt.summary.request2xx {
 				t.Errorf("expected request2xx = %d, got %d", tt.want.request2xx, tt.summary.request2xx)
 			}
-			if math.Abs(tt.want.avgDuration-tt.summary.avgDuration) > 1e-9 {
-				t.Errorf("expected avgDuration = %f, got %f", tt.want.avgDuration, tt.summary.avgDuration)
+			if math.Abs(tt.want.durationTotal-tt.summary.durationTotal) > 1e-9 {
+				t.Errorf("expected avgDuration = %f, got %f", tt.want.durationTotal, tt.summary.durationTotal)
 			}
 		})
 	}
@@ -220,27 +220,27 @@ func TestSummaries_AddRecord(t *testing.T) {
 				StatusCode: 299,
 				Duration:   0.224254673,
 			},
-			want: Summaries{"chatgpt.com": {requestTotal: 1, request2xx: 1, avgDuration: 0.224254673}},
+			want: Summaries{"chatgpt.com": {requestTotal: 1, request2xx: 1, durationTotal: 0.224254673}},
 		},
 		{name: "existing host on existing summaries",
-			summaries: Summaries{"chatgpt.com": {requestTotal: 1, request2xx: 1, avgDuration: 0.224254673}},
+			summaries: Summaries{"chatgpt.com": {requestTotal: 1, request2xx: 1, durationTotal: 0.224254673}},
 			newRecord: &Record{
 				Time:       time.Date(2025, 8, 14, 2, 7, 12, 680651416, time.UTC),
 				Host:       "chatgpt.com",
 				StatusCode: 300,
 				Duration:   0.224254673,
 			},
-			want: Summaries{"chatgpt.com": {requestTotal: 2, request2xx: 1, avgDuration: 0.224254673}},
+			want: Summaries{"chatgpt.com": {requestTotal: 2, request2xx: 1, durationTotal: 0.448509346}},
 		},
 		{name: "new host on existing summaries",
-			summaries: Summaries{"chatgpt.com": {requestTotal: 1, request2xx: 1, avgDuration: 0.224254673}},
+			summaries: Summaries{"chatgpt.com": {requestTotal: 1, request2xx: 1, durationTotal: 0.224254673}},
 			newRecord: &Record{
 				Time:       time.Date(2025, 8, 14, 2, 7, 12, 680651416, time.UTC),
 				Host:       "substrate.office.com",
 				StatusCode: 300,
 				Duration:   0.224254673,
 			},
-			want: Summaries{"chatgpt.com": {requestTotal: 1, request2xx: 1, avgDuration: 0.224254673}, "substrate.office.com": {requestTotal: 1, request2xx: 0, avgDuration: 0.224254673}},
+			want: Summaries{"chatgpt.com": {requestTotal: 1, request2xx: 1, durationTotal: 0.224254673}, "substrate.office.com": {requestTotal: 1, request2xx: 0, durationTotal: 0.224254673}},
 		},
 	}
 	for _, tt := range tests {
