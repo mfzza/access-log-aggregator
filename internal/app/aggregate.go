@@ -17,7 +17,7 @@ func aggr(aggrDone chan<- struct{}, flags config.Flags, data <-chan []byte, summ
 	printSummaries := func() {
 		fmt.Fprint(os.Stdout, summaries.Format())
 		if malformRecord > 0 {
-			fmt.Fprintln(os.Stdout, "missing field or malformed log: ", malformRecord)
+			fmt.Fprintln(os.Stdout, yellow+"missing field or malformed log:", malformRecord, reset)
 		}
 	}
 
@@ -31,7 +31,7 @@ func aggr(aggrDone chan<- struct{}, flags config.Flags, data <-chan []byte, summ
 		// when channel already empty
 		case r, ok := <-data:
 			if !ok {
-				fmt.Fprint(out, "\nPrinting final summary:")
+				fmt.Fprint(out, green+"\nPrinting final summary:"+reset)
 				printSummaries()
 				close(aggrDone)
 				return

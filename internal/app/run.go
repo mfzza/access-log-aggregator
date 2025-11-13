@@ -18,7 +18,7 @@ func Run(ctx context.Context, flags config.Flags) error {
     for _, file := range flags.Files {
         wg.Go(func() {
             if err := tail(ctx, file, flags.FromStart, data); err != nil {
-                fmt.Fprintf(os.Stderr, "[%s] error: %v\n", file, err)
+                fmt.Fprintf(os.Stderr, red + "[%s] error: %v\n"+ reset, file, err)
             }
         })
     }
