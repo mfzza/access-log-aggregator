@@ -42,19 +42,19 @@ func main() {
 		// NOTE: https://appliedgo.net/spotlight/go-1.25-waitgroup-go/
 		wg.Go(func() {
 			if err := tail(ctx, file, flags.FromStart, data); err != nil {
-				fmt.Fprintf(os.Stderr, "[%s] error tailing: %v", file, err)
+				fmt.Fprintf(os.Stderr, "[%s] error tailing: %v\n", file, err)
 			}
 		})
 	}
 
 	// consumer
-	final := make(chan struct{})
-	go aggr(final, flags, data, summaries)
+	aggrDone := make(chan struct{})
+	go aggr(aggrDone, flags, data, summaries)
 
 	// wait all tail finish, then close data channel, then wait for aggr end
 	wg.Wait()
 	close(data)
-	<-final
+	<-aggrDone
 	fmt.Println("Gracefully shutting down...")
 }
 
@@ -88,7 +88,7 @@ func tail(ctx context.Context, fpath string, fromStart bool, data chan<- []byte)
 
 }
 
-func aggr(aggrEnd chan<- struct{}, flags config.Flags, data <-chan []byte, summaries accesslog.Summarizer) {
+func aggr(aggrDone chan<- struct{}, flags config.Flags, data <-chan []byte, summaries accesslog.Summarizer) {
 	ticker := time.NewTicker(flags.Interval)
 	defer ticker.Stop()
 
@@ -112,7 +112,7 @@ func aggr(aggrEnd chan<- struct{}, flags config.Flags, data <-chan []byte, summa
 			if !ok {
 				fmt.Println("Printing final summary")
 				printSummaries()
-				close(aggrEnd)
+				close(aggrDone)
 				return
 			}
 			record, err := accesslog.NewRecord(r)
