@@ -1,4 +1,3 @@
-// tailer_test.go
 package tailer
 
 import (
@@ -107,7 +106,7 @@ func TestGetRawRecord(t *testing.T) {
 				}
 			}
 
-			// Test EOF behavior
+			// test EOF
 			if tt.wantEOF {
 				line, err := tailer.GetRawRecord()
 				if err != io.EOF {
@@ -168,7 +167,7 @@ func TestCheckRotation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			fs := newMockFileSystem()
 
-			// Setup initial file
+			// initial file
 			initialFile := newMockFile([]byte(tt.initialContent))
 			initialFile.statFunc = func() (os.FileInfo, error) {
 				return &mockFileInfo{name: "test.log", size: tt.initialSize}, nil
@@ -180,7 +179,7 @@ func TestCheckRotation(t *testing.T) {
 				t.Fatalf("Failed to create tailer: %v", err)
 			}
 
-			// Setup new file state
+			// new file state
 			newFile := newMockFile([]byte(tt.newContent))
 			newFile.statFunc = func() (os.FileInfo, error) {
 				return &mockFileInfo{name: "test.log", size: tt.newSize}, nil
@@ -208,7 +207,6 @@ func TestCheckRotation(t *testing.T) {
 				t.Errorf("checkRotation() unexpected error: %v", err)
 			}
 
-			// Verify results based on expectations
 			if tt.wantReset {
 				// Should have seeked to start
 				pos, _ := initialFile.Seek(0, io.SeekCurrent)

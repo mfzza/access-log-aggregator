@@ -4,6 +4,8 @@ import (
 	"accessAggregator/internal/config"
 	"bytes"
 	"errors"
+	"io"
+	"strings"
 	"testing"
 	"time"
 )
@@ -46,20 +48,18 @@ func TestAggr_TickerPrintsSummary(t *testing.T) {
 
 	go aggr(done, flags, data, s, out)
 
-	// Let ticker fire once
+	// ticker fire once
 	time.Sleep(20 * time.Millisecond)
 
 	close(data) // trigger exit
 	waitOrTimeout(t, done, time.Second)
 
-	got := out.String()
-	if !bytes.Contains([]byte(got), []byte("SUMMARY")) {
-		t.Fatalf("expected summary in output, got: %s", got)
+	if !strings.Contains(out.String(), "SUMMARY") {
+		t.Fatalf("expected summary in output, got: %s", out.String())
 	}
 }
 
 func TestAggr_AggregatesData(t *testing.T) {
-	out := &bytes.Buffer{}
 	s := &mockSummarizer{formatOut: "SUMMARY\n"}
 
 	data := make(chan []byte, 2)
@@ -67,7 +67,7 @@ func TestAggr_AggregatesData(t *testing.T) {
 
 	flags := config.Flags{Interval: time.Hour} // disable ticker firing
 
-	go aggr(done, flags, data, s, out)
+	go aggr(done, flags, data, s, io.Discard)
 
 	data <- []byte("A")
 	data <- []byte("B")
@@ -94,17 +94,16 @@ func TestAggr_MalformedIncrementPrinted(t *testing.T) {
 
 	go aggr(done, flags, data, s, out)
 
-	// Send malformed record
+	// send malformed record
 	data <- []byte("BAD")
-	// Wait for ticker to print summary
+	// wait for ticker to print summary
 	time.Sleep(20 * time.Millisecond)
 
 	close(data)
 	waitOrTimeout(t, done, time.Second)
 
-	got := out.String()
-	if !bytes.Contains([]byte(got), []byte("missing field or malformed log:")) {
-		t.Fatalf("expected malformed warning in output, got: %s", got)
+	if !strings.Contains(out.String(), "missing field or malformed log:") {
+		t.Fatalf("expected malformed warning in output, got: %s", out.String())
 	}
 }
 
@@ -123,18 +122,15 @@ func TestAggr_FinalSummaryAndDoneClose(t *testing.T) {
 
 	waitOrTimeout(t, done, time.Second)
 
-	got := out.String()
-
-	if !bytes.Contains([]byte(got), []byte("Printing final summary:")) {
-		t.Fatalf("expected final summary banner, got: %s", got)
+	if !strings.Contains(out.String(), "Printing final summary:") {
+		t.Fatalf("expected final summary banner, got: %s", out.String())
 	}
-	if !bytes.Contains([]byte(got), []byte("SUMMARY")) {
-		t.Fatalf("expected summary in final output, got: %s", got)
+	if !strings.Contains(out.String(), "SUMMARY") {
+		t.Fatalf("expected summary in final output, got: %s", out.String())
 	}
 }
 
 func TestAggr_DrainsAllRecordsBeforeEnd(t *testing.T) {
-	out := &bytes.Buffer{}
 	s := &mockSummarizer{formatOut: "SUMMARY\n"}
 
 	data := make(chan []byte, 3)
@@ -142,7 +138,7 @@ func TestAggr_DrainsAllRecordsBeforeEnd(t *testing.T) {
 
 	flags := config.Flags{Interval: time.Hour}
 
-	go aggr(done, flags, data, s, out)
+	go aggr(done, flags, data, s, io.Discard)
 
 	data <- []byte("1")
 	data <- []byte("2")
@@ -157,7 +153,6 @@ func TestAggr_DrainsAllRecordsBeforeEnd(t *testing.T) {
 }
 
 func TestAggr_NoGoroutineLeak(t *testing.T) {
-	out := &bytes.Buffer{}
 	s := &mockSummarizer{formatOut: "SUMMARY\n"}
 
 	data := make(chan []byte)
@@ -165,10 +160,10 @@ func TestAggr_NoGoroutineLeak(t *testing.T) {
 
 	flags := config.Flags{Interval: 10 * time.Millisecond}
 
-	go aggr(done, flags, data, s, out)
+	go aggr(done, flags, data, s, io.Discard)
 
 	close(data)
 
 	waitOrTimeout(t, done, time.Second)
-	// No hang mean success
+	// no hang mean success
 }
