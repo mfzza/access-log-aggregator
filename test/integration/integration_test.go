@@ -119,6 +119,136 @@ func TestEndToEnd(t *testing.T) {
 	}
 }
 
+func TestMalformedRecord(t *testing.T) {
+	tests := []struct {
+		name            string
+		logContent      string
+		expectMalformed bool
+		expectedHosts   []string
+		unexpectedHosts []string
+	}{
+		{
+			name: "mixed valid and malformed JSON",
+			logContent: `{"time":"2025-08-14T02:07:12.680651416Z","host":"chatgpt.com","status_code":200,"duration":0.224}
+{"time":"2025-08-14T02:07:13.680651416Z","host":"github.com","status_code":404,"duration":0.150}
+{"invalid json without closing brace
+{"time":"2025-08-14T02:07:14.680651416Z","host":"openai.com","status_code":201,"duration":0.300}
+{this is also bad json}
+{"time":"2025-08-14T02:07:15.680651416Z","host":"example.com","status_code":500,"duration":0.100}
+`,
+			expectMalformed: true,
+			expectedHosts:   []string{"chatgpt.com", "github.com", "openai.com", "example.com"},
+		},
+		{
+			name: "missing required fields",
+			logContent: `{"time":"2025-08-14T02:07:12.680651416Z","host":"chatgpt.com","status_code":200,"duration":0.224}
+{"host":"github.com","status_code":404,"duration":0.150}
+{"time":"2025-08-14T02:07:13.680651416Z","status_code":200,"duration":0.300}
+{"time":"2025-08-14T02:07:14.680651416Z","host":"openai.com","duration":0.100}
+{"time":"2025-08-14T02:07:15.680651416Z","host":"example.com","status_code":201}
+{"time":"2025-08-14T02:07:16.680651416Z","host":"valid.com","status_code":200,"duration":0.150}
+`,
+			expectMalformed: true,
+			expectedHosts:   []string{"chatgpt.com", "valid.com"},
+			unexpectedHosts: []string{"github.com", "openai.com", "example.com"},
+		},
+		{
+			name: "zero values in required fields",
+			logContent: `{"time":"2025-08-14T02:07:12.680651416Z","host":"chatgpt.com","status_code":200,"duration":0.224}
+{"time":"2025-08-14T02:07:13.680651416Z","host":"github.com","status_code":0,"duration":0.150}
+{"time":"2025-08-14T02:07:14.680651416Z","host":"openai.com","status_code":200,"duration":0}
+`,
+			expectMalformed: true,
+			expectedHosts:   []string{"chatgpt.com"},
+			unexpectedHosts: []string{"github.com", "openai.com"},
+		},
+		{
+			name: "all malformed",
+			logContent: `invalid line 1
+{bad json
+{"missing":"required_fields"}
+completely broken
+`,
+			expectMalformed: true,
+			expectedHosts:   []string{},
+		},
+		{
+			name: "all valid",
+			logContent: `{"time":"2025-08-14T02:07:12.680651416Z","host":"chatgpt.com","status_code":200,"duration":0.224}
+{"time":"2025-08-14T02:07:13.680651416Z","host":"github.com","status_code":404,"duration":0.150}
+{"time":"2025-08-14T02:07:14.680651416Z","host":"openai.com","status_code":201,"duration":0.300}
+`,
+			expectMalformed: false,
+			expectedHosts:   []string{"chatgpt.com", "github.com", "openai.com"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			logFile := filepath.Join(tmpDir, "test.log")
+
+			if err := os.WriteFile(logFile, []byte(tt.logContent), 0644); err != nil {
+				t.Fatalf("Failed to create log file: %v", err)
+			}
+
+			flags := config.Flags{
+				Files:     []string{logFile},
+				FromStart: true,
+				Interval:  500 * time.Millisecond,
+			}
+
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+
+			var out bytes.Buffer
+			done := make(chan error, 1)
+			go func() {
+				done <- app.Run(ctx, flags, &out, io.Discard)
+			}()
+
+			time.Sleep(600 * time.Millisecond)
+			cancel()
+
+			select {
+			case <-done:
+			case <-time.After(3 * time.Second):
+				t.Fatal("Test timeout")
+			}
+
+			output := out.String()
+
+			// check malformed message
+			hasMalformed := strings.Contains(output, "missing field or malformed log:")
+			if tt.expectMalformed && !hasMalformed {
+				t.Error("Expected malformed log message, but not found")
+			}
+			if !tt.expectMalformed && hasMalformed {
+				t.Error("Unexpected malformed log message found")
+			}
+
+			// verify expected hosts appear
+			for _, host := range tt.expectedHosts {
+				if !strings.Contains(output, host) {
+					t.Errorf("Expected host %q not found in output", host)
+				}
+			}
+
+			// verify unexpected hosts don't appear
+			for _, host := range tt.unexpectedHosts {
+				if strings.Contains(output, host) {
+					t.Errorf("Unexpected host %q found in output (should have been filtered)", host)
+				}
+			}
+
+			// verify final summary was printed
+			if !strings.Contains(output, "Printing final summary:") {
+				t.Error("Final summary not printed")
+			}
+		})
+	}
+}
+
 // test log rotation scenarios
 func TestFileRotationTruncated(t *testing.T) {
 	tmpDir := t.TempDir()
