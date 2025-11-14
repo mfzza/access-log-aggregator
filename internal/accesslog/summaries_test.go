@@ -24,9 +24,9 @@ func TestSummary_updateSummary(t *testing.T) {
 				Duration:   0.224254673,
 			},
 			want: &summary{
-				requestTotal: 1,
-				request2xx:   1,
-				durationTotal:  0.224254673,
+				requestTotal:  1,
+				request2xx:    1,
+				durationTotal: 0.224254673,
 			},
 		},
 		{
@@ -39,9 +39,9 @@ func TestSummary_updateSummary(t *testing.T) {
 				Duration:   0.224254673,
 			},
 			want: &summary{
-				requestTotal: 1,
-				request2xx:   0,
-				durationTotal:  0.224254673,
+				requestTotal:  1,
+				request2xx:    0,
+				durationTotal: 0.224254673,
 			},
 		},
 		{
@@ -54,9 +54,9 @@ func TestSummary_updateSummary(t *testing.T) {
 				Duration:   0.224254673,
 			},
 			want: &summary{
-				requestTotal: 1,
-				request2xx:   0,
-				durationTotal:  0.224254673,
+				requestTotal:  1,
+				request2xx:    0,
+				durationTotal: 0.224254673,
 			},
 		},
 		{
@@ -69,9 +69,9 @@ func TestSummary_updateSummary(t *testing.T) {
 				Duration:   0.224254673,
 			},
 			want: &summary{
-				requestTotal: 1,
-				request2xx:   0,
-				durationTotal:  0.224254673,
+				requestTotal:  1,
+				request2xx:    0,
+				durationTotal: 0.224254673,
 			},
 		},
 	}
@@ -137,9 +137,9 @@ func TestSummary_updateSummary_multipleRecords(t *testing.T) {
 				},
 			},
 			want: &summary{
-				requestTotal: 6,
-				request2xx:   3,
-				durationTotal:  1.345528038,
+				requestTotal:  6,
+				request2xx:    3,
+				durationTotal: 1.345528038,
 			},
 		},
 		{
@@ -179,9 +179,9 @@ func TestSummary_updateSummary_multipleRecords(t *testing.T) {
 				},
 			},
 			want: &summary{
-				requestTotal: 6,
-				request2xx:   3,
-				durationTotal:  2.39213359,
+				requestTotal:  6,
+				request2xx:    3,
+				durationTotal: 2.39213359,
 			},
 		},
 	}
@@ -204,48 +204,33 @@ func TestSummary_updateSummary_multipleRecords(t *testing.T) {
 	}
 }
 
-func TestSummaries_AddRecord(t *testing.T) {
+func TestSummaries_Aggregate(t *testing.T) {
 	tests := []struct {
 		name string // description of this test case
 		// Named input parameters for target function.
 		summaries Summaries
-		newRecord *Record
+		rawRecord []byte
 		want      Summaries
 	}{
 		{name: "new host on empty summaries",
 			summaries: Summaries{},
-			newRecord: &Record{
-				Time:       time.Date(2025, 8, 14, 2, 7, 12, 680651416, time.UTC),
-				Host:       "chatgpt.com",
-				StatusCode: 299,
-				Duration:   0.224254673,
-			},
-			want: Summaries{"chatgpt.com": {requestTotal: 1, request2xx: 1, durationTotal: 0.224254673}},
+			rawRecord: []byte(`{"time":"2025-08-14T02:07:12.680651416Z","host":"chatgpt.com","status_code":299,"duration":0.224254673}`),
+			want:      Summaries{"chatgpt.com": {requestTotal: 1, request2xx: 1, durationTotal: 0.224254673}},
 		},
 		{name: "existing host on existing summaries",
 			summaries: Summaries{"chatgpt.com": {requestTotal: 1, request2xx: 1, durationTotal: 0.224254673}},
-			newRecord: &Record{
-				Time:       time.Date(2025, 8, 14, 2, 7, 12, 680651416, time.UTC),
-				Host:       "chatgpt.com",
-				StatusCode: 300,
-				Duration:   0.224254673,
-			},
-			want: Summaries{"chatgpt.com": {requestTotal: 2, request2xx: 1, durationTotal: 0.448509346}},
+			rawRecord: []byte(`{"time":"2025-08-14T02:07:12.680651416Z","host":"chatgpt.com","status_code":300,"duration":0.224254673}`),
+			want:      Summaries{"chatgpt.com": {requestTotal: 2, request2xx: 1, durationTotal: 0.448509346}},
 		},
 		{name: "new host on existing summaries",
 			summaries: Summaries{"chatgpt.com": {requestTotal: 1, request2xx: 1, durationTotal: 0.224254673}},
-			newRecord: &Record{
-				Time:       time.Date(2025, 8, 14, 2, 7, 12, 680651416, time.UTC),
-				Host:       "substrate.office.com",
-				StatusCode: 300,
-				Duration:   0.224254673,
-			},
-			want: Summaries{"chatgpt.com": {requestTotal: 1, request2xx: 1, durationTotal: 0.224254673}, "substrate.office.com": {requestTotal: 1, request2xx: 0, durationTotal: 0.224254673}},
+			rawRecord: []byte(`{"time":"2025-08-14T02:07:12.680651416Z","host":"substrate.office.com","status_code":300,"duration":0.224254673}`),
+			want:      Summaries{"chatgpt.com": {requestTotal: 1, request2xx: 1, durationTotal: 0.224254673}, "substrate.office.com": {requestTotal: 1, request2xx: 0, durationTotal: 0.224254673}},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.summaries.AddRecord(tt.newRecord)
+			tt.summaries.Aggregate(tt.rawRecord)
 			if len(tt.summaries) != len(tt.want) {
 				t.Fatalf("expected map length %d, tt.summaries %d", len(tt.want), len(tt.summaries))
 			}
