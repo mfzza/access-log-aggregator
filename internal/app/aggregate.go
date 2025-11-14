@@ -5,7 +5,6 @@ import (
 	"accessAggregator/internal/config"
 	"fmt"
 	"io"
-	"os"
 	"time"
 )
 
@@ -15,9 +14,9 @@ func aggr(aggrDone chan<- struct{}, flags config.Flags, data <-chan []byte, summ
 
 	var malformRecord int
 	printSummaries := func() {
-		fmt.Fprint(os.Stdout, summaries.Format())
+		fmt.Fprint(out, summaries.Format())
 		if malformRecord > 0 {
-			fmt.Fprintln(os.Stdout, yellow+"missing field or malformed log:", malformRecord, reset)
+			fmt.Fprintln(out, yellow+"missing field or malformed log:", malformRecord, reset)
 		}
 	}
 
