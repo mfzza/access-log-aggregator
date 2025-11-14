@@ -119,6 +119,44 @@ func TestEndToEnd(t *testing.T) {
 	}
 }
 
+func TestNonExistentFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	nonExistentFile := filepath.Join(tmpDir, "does-not-exist.log")
+
+	flags := config.Flags{
+		Files:     []string{nonExistentFile},
+		FromStart: true,
+		Interval:  500 * time.Millisecond,
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+	done := make(chan error, 1)
+	go func() {
+		done <- app.Run(ctx, flags, &out, &errOut)
+	}()
+
+	time.Sleep(100 * time.Millisecond)
+	cancel()
+
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("Test timeout")
+	}
+
+	if !strings.Contains(errOut.String(), "does-not-exist.log") {
+		t.Error("Expected filename in error output")
+	}
+	if !strings.Contains(errOut.String(), "error:") {
+		t.Error("Expected error message")
+	}
+}
+
+// test with malformed record
 func TestMalformedRecord(t *testing.T) {
 	tests := []struct {
 		name            string
