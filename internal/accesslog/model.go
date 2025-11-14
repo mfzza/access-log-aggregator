@@ -13,12 +13,6 @@ type Record struct {
 	Duration   float64   `json:"duration"`
 }
 
-type summary struct {
-	requestTotal  int
-	request2xx    int
-	durationTotal float64 // in seconds
-}
-
 func NewRecord(rawRecord []byte) (*Record, error) {
 	var r Record
 	err := json.Unmarshal(rawRecord, &r)
@@ -32,6 +26,12 @@ func NewRecord(rawRecord []byte) (*Record, error) {
 	}
 
 	return &r, nil
+}
+
+type summary struct {
+	requestTotal  int
+	request2xx    int
+	durationTotal float64 // in seconds
 }
 
 type Summarizer interface {
